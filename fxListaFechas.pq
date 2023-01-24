@@ -8,7 +8,7 @@ let
 let 
 //Numero de días entre las fechas
     Duracion =    //Se suma un día para ajustar la cantidad en la resta
-        Number.Abs(Duration.TotalDays(FechaMaximo-FechaMinimo))+1,    
+        Number.Abs(Duration.TotalDays(FechaMaximo-FechaMinimo))+1,
 //Crea un listado de fechas
     ListaFechas = List.Dates(List.Min({Date.From(FechaMinimo), Date.From(FechaMaximo)}), Duracion, #duration(1,0,0,0)),
 //Pasa el listado a una tabla utilizable
@@ -28,8 +28,7 @@ in
 Documentacion =
     type function (
     FechaMinimo as date,
-    FechaMaximo as date) 
-as list meta
+    FechaMaximo as date) as list meta
     [Documentation.Name = "fxListaFechas",
     Documentation.LongDescription = "Esta función toma una fecha inicial y una fecha final y genera un listado entre estas 2 fechas día por día; toma automáticamente cual es la fecha inicial o menor y la final o mas reciente",
     Documentation.Examples = 
