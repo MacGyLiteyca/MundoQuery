@@ -1,4 +1,5 @@
 // fxListaFechas
+// Al utilizar como columna adicional se coloca type table[Fecha=date, Año=Int64.Type, Mes=Int64.Type]
 let
     fxListaFechas = let
         Funcion = ( //optional al colocar al inicio de uno de los parámetros permite que sea opcional, tambien debe quedar opcional en el resto de pasos de la documentación

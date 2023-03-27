@@ -1,4 +1,5 @@
 // MyFXAccesos
+// Al utilizar como columna adicional se coloca type table[CCTec=text, Acceso=text, Cargo=text, Año=Int64.Type, Mes=Int64.Type, Fecha=date]
 let
     Source = (CC as nullable text, CCGestor as nullable text, CCSuper as nullable text, CCContratista as nullable text, CargoContratista as nullable text, Fecha as nullable date) as table => let
     MyFx = (MyCC as any, MyAcceso as any, MyCargo as any, MyFecha as any)=> let
