@@ -1,24 +1,29 @@
 // InfoID
 let
+    MyRuta = Ruta&"\TablasBase\ResultadosPrevios\Indicadores",
     TransformarInfoID =
-    let
-        Origen = (ParámetroInfoID as binary) => let
-            Source = Excel.Workbook(ParámetroInfoID, null, true),
-            Indicadores_Table = Source{[Item="Indicadores",Kind="Table"]}[Data],
-            #"Removed Other Columns" = Table.SelectColumns(Indicadores_Table,{"Fecha", "External ID", "Departamento", "EECC Colaboradora"}),
-            #"Changed Type" = Table.TransformColumnTypes(#"Removed Other Columns",{{"Fecha", type date}, {"External ID", type text}, {"Departamento", type text}, {"EECC Colaboradora", type text}}),
-            #"Grouped Rows" = Table.Group(#"Changed Type", {"External ID", "Departamento", "EECC Colaboradora"}, {{"FechaMin", each List.Min([Fecha]), type nullable date}, {"FechaMax", each List.Max([Fecha]), type nullable date}})
+        let
+            Origen = (ParámetroInfoID as binary) => let
+                Source = Excel.Workbook(ParámetroInfoID, null, true),
+                Indicadores_Table = Source{[Item="Indicadores",Kind="Table"]}[Data],
+                RemovedOtherColumns = Table.SelectColumns(Indicadores_Table,{"Fecha", "External ID", "Departamento", "EECC Colaboradora"}),
+                ChangedType = Table.TransformColumnTypes(RemovedOtherColumns,{{"Fecha", type date}, {"External ID", type text}, {"Departamento", type text}, {"EECC Colaboradora", type text}}),
+                GroupedRows = Table.Group(ChangedType, {"External ID", "Departamento", "EECC Colaboradora"}, {{"FechaMin", each List.Min([Fecha]), type nullable date}, {"FechaMax", each List.Max([Fecha]), type nullable date}})
+            in
+                GroupedRows
         in
-            #"Grouped Rows"
-    in
-        Origen,
+            Origen,
     EjemploInfoID =
-    let
-        Source = Folder.Files("C:\Users\MacLiteyca\Nextcloud\CLARO\TablasBase\ResultadosPrevios\Indicadores"),
-        Navigation1 = Source{0}[Content]
-    in
-        Navigation1,
-    Source = Folder.Files("C:\Users\MacLiteyca\Nextcloud\CLARO\TablasBase\ResultadosPrevios\Indicadores"),
+        let
+            Source = Folder.Files(MyRuta),
+            Navigation1 = Source{0}[Content]
+        in
+            Navigation1,
+    MesAct =
+        let 
+            Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Clar/Consultas/MesUtilizar.pq")), #shared)
+        in Source, 
+    Source = Folder.Files(MyRuta),
     MesAgregado = Table.TransformColumnTypes(Table.AddColumn(Source, "Mes", each Text.BetweenDelimiters([Name], ".", "."), type text),{{"Mes", type number}}),
     AnAgregado = Table.TransformColumnTypes(Table.AddColumn(MesAgregado, "Año", each Text.BetweenDelimiters([Name], ".", " ", 1, 0), type text),{{"Año", type number}}),
     MergedFilterMesACT = Table.NestedJoin(AnAgregado, {"Año", "Mes"}, MesAct, {"Año", "Mes"}, "MesAct", JoinKind.RightOuter),

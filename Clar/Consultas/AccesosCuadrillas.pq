@@ -1,10 +1,29 @@
 // AccesoCuadrillas
 let
-    Source = InfoID,
     fxListaFechas =
+        let 
+            Source = Expression.Evaluate(Text.FromBinary(Web.Contents( "https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/fxListaFechas.pq") ), #shared)
+        in Source,
+    CuadrillasFechas =
+        let 
+            Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Clar/Consultas/CuadriFechas.pq")), #shared)
+        in Source,
+    MyFXAccesos = 
     let 
-        Source = Expression.Evaluate(Text.FromBinary(Web.Contents( "https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/fxListaFechas.pq") ), #shared)
+        Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Clar/Consultas/MyFXAccesosClaro.pq")), #shared)
     in Source,
+    Usuarios = 
+        let 
+            Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Clar/Consultas/Usuarios.pq")), #shared)
+        in Source,
+    TBLAccesoCuadrillas = 
+        let 
+            Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Clar/Consultas/TBLAccesoCuadrillas.pq")), #shared)
+        in Source,
+    Source = 
+        let 
+            Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Clar/Consultas/InfoID.pq")), #shared)
+        in Source,
     FilteredRows = Table.SelectRows(Source, each [External ID] <> null and [External ID] <> ""),
     InvokedListaFechas = Table.AddColumn(FilteredRows, "fxListaFechas", each fxListaFechas([FechaMin], [FechaMax]), type table[Fecha=date, Año=Int64.Type, Mes=Int64.Type]),
     ExpandedListaFechas = Table.ExpandTableColumn(InvokedListaFechas, "fxListaFechas", {"Fecha"}, {"Fecha"}),

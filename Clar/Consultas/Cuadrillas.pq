@@ -1,25 +1,28 @@
 // Cuadrillas
 let
-    TransformarCuadrillas =
-    let
-        Origen = (ParámetroCuadrillas as binary) => let
+    MyRuta = Ruta&"\Indicadores\ConformacionCuadrillas",
+    TransformarCuadrillas = 
+        let
+            Origen = (ParámetroCuadrillas as binary) => let
             Source = Excel.Workbook(ParámetroCuadrillas, null, true),
             CONFORMACION_CONSOLIDADO_Table = Source{[Item="CONFORMACION_CONSOLIDADO",Kind="Table"]}[Data],
-            #"Removed Other Columns" = Table.SelectColumns(CONFORMACION_CONSOLIDADO_Table,{"EMPRESA", "DEPARTAMENTO", "CEDULA TECNICO", "NOMBRE TECNICO", "CEDULA AUX GESTION", "AUXILIAR DE GESTION", "CEDULA SUPERVISOR", "SUPERVISOR", "CEDULA LIDER ", "LIDER DE GESTION", "CEDULA PROFESIONAL", "PROFESIONAL", "FECHA INICIAL", "FECHA FIN"}),
-            #"Changed Type" = Table.TransformColumnTypes(#"Removed Other Columns",{{"EMPRESA", type text}, {"DEPARTAMENTO", type text}, {"CEDULA TECNICO", type text}, {"NOMBRE TECNICO", type text}, {"CEDULA AUX GESTION", type text}, {"AUXILIAR DE GESTION", type text}, {"CEDULA SUPERVISOR", type text}, {"SUPERVISOR", type text}, {"CEDULA LIDER ", type text}, {"LIDER DE GESTION", type text}, {"CEDULA PROFESIONAL", type text}, {"PROFESIONAL", type text}, {"FECHA INICIAL", type date}, {"FECHA FIN", type date}})
+            RemovedOtherColumns = Table.SelectColumns(CONFORMACION_CONSOLIDADO_Table,{"EMPRESA", "DEPARTAMENTO", "CEDULA TECNICO", "NOMBRE TECNICO", "CEDULA AUX GESTION", "AUXILIAR DE GESTION", "CEDULA SUPERVISOR", "SUPERVISOR", "CEDULA LIDER ", "LIDER DE GESTION", "CEDULA PROFESIONAL", "PROFESIONAL", "FECHA INICIAL", "FECHA FIN"}),
+            ChangedType = Table.TransformColumnTypes(RemovedOtherColumns,{{"EMPRESA", type text}, {"DEPARTAMENTO", type text}, {"CEDULA TECNICO", type text}, {"NOMBRE TECNICO", type text}, {"CEDULA AUX GESTION", type text}, {"AUXILIAR DE GESTION", type text}, {"CEDULA SUPERVISOR", type text}, {"SUPERVISOR", type text}, {"CEDULA LIDER ", type text}, {"LIDER DE GESTION", type text}, {"CEDULA PROFESIONAL", type text}, {"PROFESIONAL", type text}, {"FECHA INICIAL", type date}, {"FECHA FIN", type date}})
         in
-            #"Changed Type"
+            ChangedType
     in
         Origen,
-
     EjemploCuadrillas =
-    let
-        Source = Folder.Files("C:\Users\MacLiteyca\Nextcloud\CLARO\TablasBase\Indicadores\ConformacionCuadrillas"),
-        Navigation1 = Source{0}[Content]
-    in
-        Navigation1,
-
-    Source = Folder.Files("C:\Users\MacLiteyca\Nextcloud\CLARO\TablasBase\Indicadores\ConformacionCuadrillas"),
+        let
+            Source = Folder.Files(MyRuta),
+            Navigation1 = Source{0}[Content]
+        in
+            Navigation1,
+    MesAct =
+        let 
+            Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Clar/Consultas/MesUtilizar.pq")), #shared)
+        in Source, 
+    Source = Folder.Files(MyRuta),
     MesInsertado = Table.AddColumn(Source, "Mes", each Text.BetweenDelimiters([Name], " ", "."), type text),
     AñoInsertado = Table.AddColumn(MesInsertado, "Año", each Text.BetweenDelimiters([Name], ".", "."), type text),
     #"Inserted Merged Column" = Table.AddColumn(AñoInsertado, "FechaArchivo", each Text.Combine({"01", [Mes], [Año]}, "/"), type text),
