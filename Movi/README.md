@@ -8,6 +8,6 @@ En las siguientes lineas se encuentra la información de como obtener estas cons
 
 
 
-| Column 1 | Column 2 |
-|---|---|
-| This is a cell | This is another cell |
+| Nombre | Consulta | Util Extra |
+|---|---|---|
+| This is a cell | This is another cell | otro |
