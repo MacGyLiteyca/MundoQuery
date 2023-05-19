@@ -8,5 +8,5 @@ En las siguientes lineas se encuentra la información de como obtener estas cons
 |fxMyCalendarioFinal.pq|let Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/fxMyCalendarioFinal.pq") ), #shared) in Source||
 |ProduccionAltas.pq|let Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/Produccion/ProduccionAltas.pq") ), #shared) in Source||
 |ProduccionMantenimiento.pq|let Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/Produccion/ProduccionMantenimiento.pq") ), #shared) in Source||
-|ConsolidadoCuadrillas.pq|let Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/Produccion/ProduccionMantenimiento.pq") ), #shared) in Source||
+|ConsolidadoCuadrillas.pq|let Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://github.com/MacGyLiteyca/MundoQuery/blob/main/Movi/Produccion/ConsolidadoCuadrillas.pq") ), #shared) in Source||
 |Mes_Actu.pq|let Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/Mes_Actu.pq") ), #shared) in Source||
