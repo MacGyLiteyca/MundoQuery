@@ -2,8 +2,8 @@
 
 En las siguientes lineas se encuentra la información de como obtener estas consultas desde power query
 
-|Nombre|Consulta|UtilExtra|
-|fxMyCalendario2.pq|let Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/fxMyCalendario2.pq") ), #shared) in Source||
+
+
 |fxMyCalendarioFinal.pq|let Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/fxMyCalendarioFinal.pq") ), #shared) in Source||
 
 
@@ -11,3 +11,4 @@ En las siguientes lineas se encuentra la información de como obtener estas cons
 | Nombre | Consulta | Util Extra |
 |---|---|---|
 | This is a cell | This is another cell | otro |
+|fxMyCalendario2.pq|let Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/fxMyCalendario2.pq") ), #shared) in Source| Algo mas|
