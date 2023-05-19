@@ -1,4 +1,4 @@
-#Informacion util para este proyecto
+# Informacion util para este proyecto
 
 En las siguientes lineas se encuentra la información de como obtener estas consultas desde power query
 
