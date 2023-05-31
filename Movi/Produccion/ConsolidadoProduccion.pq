@@ -1,13 +1,5 @@
 // ConsolidadoProduccion
 let
-// Mes_Actu
-    Mes_Actu = let
-        Source = try(Excel.CurrentWorkbook(){[Name="Mes_Actu"]}[Content])otherwise(null),
-        Changed_Type = try(Table.TransformColumnTypes(Source,{{"Mes", Int64.Type}, {"Año", Int64.Type}}))otherwise(Source),
-        Tabla_Mes_Actual = #table(type table[Mes = Int64.Type, Año = Int64.Type], {{Date.Month(DateTime.FixedLocalNow()), Date.Year(DateTime.FixedLocalNow())}}),
-        Mes_Actualizar = if(EsHistorial)then(Changed_Type)else(Tabla_Mes_Actual)
-    in
-        Mes_Actualizar,
 // fxMyCalendarioFinal
     fxMyCalendarioFinal = let Source = 
         Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/fxMyCalendarioFinal.pq") ), #shared) in Source, 
