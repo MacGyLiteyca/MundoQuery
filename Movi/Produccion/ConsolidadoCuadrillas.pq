@@ -30,9 +30,10 @@ let
         UppercasedText = Table.TransformColumns(CleanedText,{{"EMPRESA", Text.Upper, type text}, {"DEPARTAMENTO", Text.Upper, type text}, {"AREA", Text.Upper, type text}, {"NOMBRE TECNICO", Text.Upper, type text}, {"TIPO CUADRILLA", Text.Upper, type text}, {"AUXILIAR DE GESTION", Text.Upper, type text}, {"SUPERVISOR", Text.Upper, type text}, {"NOMBRE AUXILIAR", Text.Upper, type text}}),
     //Se quitan las filas que contengan errores
         RemovedErrors = Table.RemoveRowsWithErrors(UppercasedText, {"EMPRESA", "DEPARTAMENTO", "AREA", "CEDULA TECNICO", "NOMBRE TECNICO", "TIPO CUADRILLA", "ID RECURSO TOA", "CEDULA AUX GESTION", "AUXILIAR DE GESTION", "CEDULA SUPERVISOR", "SUPERVISOR", "Fecha Inicial", "Fecha Final", "NOMBRE AUXILIAR", "CEDULA AUXILIAR"}),
-        SelectedColumns = Table.SelectColumns(RemovedErrors,{"EMPRESA", "DEPARTAMENTO", "AREA", "CEDULA TECNICO", "NOMBRE TECNICO", "TIPO CUADRILLA", "ID RECURSO TOA", "CEDULA AUX GESTION", "AUXILIAR DE GESTION", "CEDULA SUPERVISOR", "SUPERVISOR", "Fecha Inicial", "Fecha Final", "NOMBRE AUXILIAR", "CEDULA AUXILIAR"})
+        SelectedColumns = Table.SelectColumns(RemovedErrors,{"EMPRESA", "DEPARTAMENTO", "AREA", "CEDULA TECNICO", "NOMBRE TECNICO", "TIPO CUADRILLA", "ID RECURSO TOA", "CEDULA AUX GESTION", "AUXILIAR DE GESTION", "CEDULA SUPERVISOR", "SUPERVISOR", "Fecha Inicial", "Fecha Final", "NOMBRE AUXILIAR", "CEDULA AUXILIAR"}),
+        Filtered_Null_CC_Tec = Table.SelectRows(SelectedColumns, each [CEDULA TECNICO] <> null and [CEDULA TECNICO] <> "")
     in
-        SelectedColumns
+        Filtered_Null_CC_Tec
         in
             Origen,
 
