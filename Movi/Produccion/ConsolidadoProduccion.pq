@@ -8,7 +8,7 @@ let
         Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/fxMyCalendarioDia.pq") ), #shared) in Source, 
 // TblDepartamentos
     TblDepartamentos = let
-        Source = Excel.Workbook(File.Contents("C:\Users\MacLiteyca\Nextcloud\ProduccionTecnicos\VersionesBI\V12 Mac\Tablas Base V2.xlsx"), null, true),
+        Source = Excel.Workbook(File.Contents(Ruta&"\VersionesBI\V12 Mac\Tablas Base V2.xlsx"), null, true),
         TblDepartamentos_Table = Source{[Item="TblDepartamentos",Kind="Table"]}[Data],
         Changed_Type = Table.TransformColumnTypes(TblDepartamentos_Table,{{"FechaInicio", type date}, {"FechaFin", type date}, {"Departamento", type text}, {"Zona", type text}, {"Latitud", type number}, {"Longitud", type number}}),
         Trimmed_Dep = Table.TransformColumns(Changed_Type,{{"Departamento", Text.Trim, type text}}),
@@ -93,7 +93,7 @@ let
         Capitalized_Each_Word, 
 // TblMetaMostrar
     TblMetaMostrar = let
-        Source = Excel.Workbook(File.Contents("C:\Users\MacLiteyca\Nextcloud\ProduccionTecnicos\VersionesBI\V12 Mac\Tablas Base V2.xlsx"), null, true),
+        Source = Excel.Workbook(File.Contents(Ruta&"\VersionesBI\V12 Mac\Tablas Base V2.xlsx"), null, true),
         TblMetaMostrar_Table = Source{[Item="TblMetaMostrar",Kind="Table"]}[Data],
         Changed_Type = Table.TransformColumnTypes(TblMetaMostrar_Table,{{"FechaInicio", type date}, {"FechaFin", type date}, {"Departamento", type text}, {"CuadrillaArea", type text}, {"Tipo", type text}, {"MetaMostrar", type number}}),
         Trimmed_Text_Dep = Table.TransformColumns(Changed_Type,{{"Departamento", Text.Trim, type text}}),
@@ -167,7 +167,7 @@ in
         Appended_Cuadrillas_Sin_Produccion, 
 // HomAreaVal
     HomAreaVal = let
-        Source = Excel.Workbook(File.Contents("C:\Users\MacLiteyca\Nextcloud\ProduccionTecnicos\VersionesBI\V12 Mac\Tablas Base V2.xlsx"), null, true),
+        Source = Excel.Workbook(File.Contents(Ruta&"\VersionesBI\V12 Mac\Tablas Base V2.xlsx"), null, true),
         HomAreaVal_Table = Source{[Item="HomAreaVal",Kind="Table"]}[Data],
         Changed_Type = Table.TransformColumnTypes(HomAreaVal_Table,{{"FechaInicio", type date}, {"FechaFin", type date}, {"Area", type text}, {"AreaHom", type text}, {"Valor", type number}, {"Valor Tec", Int64.Type}, {"Valor Admin", Int64.Type}}),
         Invoked_My_Calendario = fxMyCalendarioDia(Changed_Type, "FechaInicio", "FechaFin"),
