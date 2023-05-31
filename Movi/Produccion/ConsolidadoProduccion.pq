@@ -80,7 +80,7 @@ let
         Fx_My_Calendario, 
 // TblBonos
     TblBonos = let
-        Source = Excel.Workbook(File.Contents("C:\Users\MacLiteyca\Nextcloud\ProduccionTecnicos\VersionesBI\V12 Mac\Tablas Base V2.xlsx"), null, true),
+        Source = Excel.Workbook(File.Contents(Ruta&"\VersionesBI\V12 Mac\Tablas Base V2.xlsx"), null, true),
         TblBonos_Table = Source{[Item="TblBonos",Kind="Table"]}[Data],
         Changed_Type = Table.TransformColumnTypes(TblBonos_Table,{{"FechaInicio", type date}, {"FechaFin", type date}, {"Cargo", type text}, {"CuadrillaArea", type text}, {"TipoCuadrilla", type text}, {"BonoCuadrilla", type number}, {"IncrementoBono", type number}, {"MetaMes", type number}, {"Salario", Int64.Type}, {"Max Porc Bono", type number}, {"Parte Presta", type number}, {"Parte Cuadri 2 Per", type number}}),
         My_Calendario_Dia = fxMyCalendarioDia(Changed_Type, "FechaInicio", "FechaFin"),
