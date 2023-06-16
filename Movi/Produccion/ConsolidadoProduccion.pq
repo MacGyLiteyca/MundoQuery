@@ -26,9 +26,10 @@ let
         Capitalized_Dep = Table.TransformColumns(Cleaned_Dep,{{"Departamento", Text.Proper, type text}}),
         Added_Area_Cuadri = Table.AddColumn(Capitalized_Dep, "AreaCuadri", each "INSTALACIONES", type text),
         Merged_Tbl_Dep = Table.NestedJoin(Added_Area_Cuadri, {"Departamento", "Fecha"}, TblDepartamentos, {"Departamento", "Fecha"}, "TblDepartamentos", JoinKind.RightOuter),
-        Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Dep, each [Departamento] <> null and [Departamento] <> "")
+        Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Dep, each [Departamento] <> null and [Departamento] <> ""),
+        Removed_Duplicates = Table.Distinct(Filtered_Null_Dep)
     in
-        Filtered_Null_Dep, 
+        Removed_Duplicates, 
 // ProduccionMantenimiento
     ProduccionMantenimiento = let 
         Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/Produccion/ProduccionMantenimiento.pq") ), #shared),
@@ -37,8 +38,10 @@ let
         Capitalized_Dep = Table.TransformColumns(Cleaned_Dep,{{"Departamento", Text.Proper, type text}}),
         Added_Area_Cuadri = Table.AddColumn(Capitalized_Dep, "AreaCuadri", each "MANTENIMIENTO", type text),
         Merged_Tbl_Dep = Table.NestedJoin(Added_Area_Cuadri, {"Departamento", "Fecha"}, TblDepartamentos, {"Departamento", "Fecha"}, "TblDepartamentos", JoinKind.RightOuter),
-        Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Dep, each [Departamento] <> null and [Departamento] <> "") 
-    in Filtered_Null_Dep, 
+        Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Dep, each [Departamento] <> null and [Departamento] <> ""),
+        Removed_Duplicates = Table.Distinct(Filtered_Null_Dep)
+    in 
+        Removed_Duplicates, 
 // ConsolidadoCuadrillas
     ConsolidadoCuadrillas = let 
         Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/Produccion/ConsolidadoCuadrillas.pq") ), #shared),
