@@ -134,11 +134,6 @@ in
     Added_Dia_Trabajado, 
 // Cuadrillas_Sin_Produccion
     Cuadrillas_Sin_Produccion = let
-    My_Produccion = Table.Combine({ProduccionAltas, ProduccionMantenimiento}),
-    Source = let
-        Source = ConsolidadoCuadrillas,
-        // Cuadrillas_Sin_Produccion
-    Cuadrillas_Sin_Produccion = let
         My_Produccion = Table.Combine({ProduccionAltas, ProduccionMantenimiento}),
         Source = let
             Source = ConsolidadoCuadrillas,
