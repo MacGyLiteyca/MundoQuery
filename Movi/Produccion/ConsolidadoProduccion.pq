@@ -134,24 +134,29 @@ in
     Added_Dia_Trabajado, 
 // Cuadrillas_Sin_Produccion
     Cuadrillas_Sin_Produccion = let
+    My_Produccion = Table.Combine({ProduccionAltas, ProduccionMantenimiento}),
+    Source = let
+        Source = ConsolidadoCuadrillas,
+        // Cuadrillas_Sin_Produccion
+    Cuadrillas_Sin_Produccion = let
         My_Produccion = Table.Combine({ProduccionAltas, ProduccionMantenimiento}),
         Source = let
             Source = ConsolidadoCuadrillas,
-            Renamed_Columns = Table.RenameColumns(Source,{{"Departamento", "DepCuadri"}, {"CC", "CC Tec"}}),
-            Removed_Other_Columns = Table.SelectColumns(Renamed_Columns,{"Contrata", "DepCuadri", "AreaCuadri", "CC Tec", "Nom Tec", "Tipo Cuadrilla", "CC Gest", "Nom Gest", "CC Super", "Nom Super", "Fecha Inicial", "Fecha Final", "Nom Aux", "CC Aux"}),
+            Renamed_Columns = Table.RenameColumns(Source,{{"Departamento", "Dep Cuadri"}, {"CC", "CC Tec"}}),
+            Removed_Other_Columns = Table.SelectColumns(Renamed_Columns,{"Contrata", "Dep Cuadri", "AreaCuadri", "CC Tec", "Nom Tec", "Tipo Cuadrilla", "CC Gest", "Nom Gest", "CC Super", "Nom Super", "Fecha Inicial", "Fecha Final", "Nom Aux", "CC Aux"}),
             Appended_Query = Table.Combine({Removed_Other_Columns, Personal_Sin_Cuadrillas}),
             fxMyCalendario = fxMyCalendarioFinal(Appended_Query, "Fecha Inicial", "Fecha Final"),
             Removed_Duplicates = Table.Distinct(fxMyCalendario)
         in
             Removed_Duplicates,
-        Selected_Columns = Table.SelectColumns(Source,{"DepCuadri", "CC Tec", "Fecha"}),
-        Trimmed_Text = Table.TransformColumns(Selected_Columns,{{"DepCuadri", Text.Trim, type text}}),
-        Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"DepCuadri", Text.Clean, type text}}),
-        Capitalized_Dep = Table.TransformColumns(Cleaned_Text,{{"DepCuadri", Text.Proper, type text}}),
-        Merged_Produccion = Table.NestedJoin(Capitalized_Dep, {"DepCuadri", "CC Tec", "Fecha"}, My_Produccion, {"Departamento", "CC Tec", "Fecha"}, "Produccion", JoinKind.LeftAnti),
+        Selected_Columns = Table.SelectColumns(Source,{"Dep Cuadri", "CC Tec", "Fecha"}),
+        Trimmed_Text = Table.TransformColumns(Selected_Columns,{{"Dep Cuadri", Text.Trim, type text}}),
+        Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Dep Cuadri", Text.Clean, type text}}),
+        Capitalized_Dep = Table.TransformColumns(Cleaned_Text,{{"Dep Cuadri", Text.Proper, type text}}),
+        Merged_Produccion = Table.NestedJoin(Capitalized_Dep, {"Dep Cuadri", "CC Tec", "Fecha"}, My_Produccion, {"Departamento", "CC Tec", "Fecha"}, "Produccion", JoinKind.LeftAnti),
         Expanded_Produccion = Table.ExpandTableColumn(Merged_Produccion, "Produccion", {"Atiempo", "Atis", "Tipo Orden", "Tipo Tarea", "Medio de Acceso", "Baremos", "AreaCuadri", "Actividades"}, {"Atiempo", "Atis", "Tipo Orden", "Tipo Tarea", "Medio de Acceso", "Baremos", "AreaCuadri", "Actividades"}),
-        Filtered_Null_Dep = Table.SelectRows(Expanded_Produccion, each [DepCuadri] <> null and [DepCuadri] <> ""),
-        Renamed_Departamento = Table.RenameColumns(Filtered_Null_Dep,{{"DepCuadri", "Departamento"}}),
+        Filtered_Null_Dep = Table.SelectRows(Expanded_Produccion, each [Dep Cuadri] <> null and [Dep Cuadri] <> ""),
+        Renamed_Departamento = Table.RenameColumns(Filtered_Null_Dep,{{"Dep Cuadri", "Departamento"}}),
         Replaced_Null_Bar_Act = Table.ReplaceValue(Renamed_Departamento,null,0,Replacer.ReplaceValue,{"Baremos", "Actividades"}),
         Added_Recuento = Table.AddColumn(Replaced_Null_Bar_Act, "Recuento", each 1, Int64.Type),
         Added_Dia_Trabajado = Table.AddColumn(Added_Recuento, "DiaTrabajado", each 1, type number),
