@@ -6,6 +6,9 @@ let
 // fxMyCalendarioDia
     fxMyCalendarioDia = let 
         Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/Movi/fxMyCalendarioDia.pq") ), #shared) in Source, 
+// fxMyListaFechas
+    fxMyfxListaFechas = let 
+        Source = Expression.Evaluate(Text.FromBinary(Web.Contents("https://raw.githubusercontent.com/MacGyLiteyca/MundoQuery/main/fxListaFechas.pq") ), #shared) in Source, 
 // TblDepartamentos
     TblDepartamentos = let
         Source = Excel.Workbook(File.Contents(Ruta&"\VersionesBI\V12 Mac\Tablas Base V2.xlsx"), null, true),
@@ -177,6 +180,64 @@ in
         Merged_Mes_Act = Table.NestedJoin(Invoked_My_Calendario, {"Mes", "Año"}, Mes_Actu, {"Mes", "Año"}, "Mes_Actu", JoinKind.RightOuter)
     in
         Merged_Mes_Act, 
+//Calidad_I_M
+    Calidad_I_M = let
+        MyRuta = Ruta, 
+        MyArchivoUtilizar = Archivos_Utilizar,
+        MyTransformaReitero = TransformaReitero,
+        MyEjemploReitero = EjemploReitero,
+        MyTransformaInfancia = TransformaInfancia,
+        MyEjemploInfancia = EjemploInfancia,
+        MyInfancias = let
+            Source = Folder.Files(MyRuta&"\CalculoBonificacion\Infancia"),
+            Insertado_Year = Table.AddColumn(Source, "Año", each Text.BetweenDelimiters([Name], "_", ".", 1, 0), type text),
+            Insertado_Mes = Table.AddColumn(Insertado_Year, "Mes", each Text.BetweenDelimiters([Name], "_", "_"), type text),
+            Changed_Type_Date = Table.TransformColumnTypes(Insertado_Mes,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
+            Merged_Mes_Actu = Table.NestedJoin(Changed_Type_Date, {"Mes", "Año"}, MyArchivoUtilizar, {"Mes", "Año"}, "Archivos_Utilizar", JoinKind.RightOuter),
+            Filtered_Null_Name = Table.SelectRows(Merged_Mes_Actu, each [Name] <> null and [Name] <> ""),
+            FilteredHiddenFiles = Table.SelectRows(Filtered_Null_Name, each [Attributes]?[Hidden]? <> true),
+            InvokeCustomFunction = Table.AddColumn(FilteredHiddenFiles, "Transformar archivo", each MyTransformaInfancia([Content])),
+            RemovedOtherColumns = Table.SelectColumns(InvokeCustomFunction,{"Transformar archivo"}),
+            RemovedErrors = Table.RemoveRowsWithErrors(RemovedOtherColumns, {"Transformar archivo"}),
+            ExpandedTableColumn = Table.ExpandTableColumn(RemovedErrors, "Transformar archivo", Table.ColumnNames(MyTransformaInfancia(MyEjemploInfancia))),
+            ChangedType = Table.TransformColumnTypes(ExpandedTableColumn,{{"XA_ACTUACION_ALTA", type text}, {"Pet_atis_ALTA", type text}, {"PRODUCTO", type text}, {"Medio_de_Acceso_ALTA", type text}, {"Fecha_de_cierre_final_ALTA", type date}, {"external_id", type text}, {"Departamento", type text}, {"Año", Int64.Type}, {"Mes", Int64.Type}, {"APERTURA_AV", type text}, {"CIERRE_AV", type text}}),
+            RemovedOtherColumns1 = Table.SelectColumns(ChangedType,{"Pet_atis_ALTA", "CIERRE_AV", "APERTURA_AV"}),
+            AddedExcluir = Table.AddColumn(RemovedOtherColumns1, "Excluir", each "NO", type text),
+            RenamedColumns = Table.RenameColumns(AddedExcluir,{{"Pet_atis_ALTA", "Pet_atis"}})
+        in
+            RenamedColumns,
+        MyCausalesExcluirReitero = let        
+            Source = Excel.Workbook(File.Contents(MyRuta&"\VersionesBI\V12 Mac\Tablas Base V2.xlsx"), null, true),
+            CausalesExcluirReitero_Table = Source{[Item="CausalesExcluirReitero",Kind="Table"]}[Data],
+            ChangedType = Table.TransformColumnTypes(CausalesExcluirReitero_Table,{{"Acceso", type text}, {"Causal", type text}, {"Excluir", type text}, {"Fecha Inicio", type date}, {"Fecha Fin", type date}}),
+            InvokedListaFechas = Table.AddColumn(ChangedType, "fxListaFechas", each fxMyfxListaFechas([Fecha Inicio], [Fecha Fin]), type table[Fecha=date, Año=Int64.Type, Mes=Int64.Type]),
+            ExpandedListaFechas = Table.ExpandTableColumn(InvokedListaFechas, "fxListaFechas", {"Año", "Mes"}, {"Año", "Mes"}),
+            RemovedDuplicates = Table.Distinct(ExpandedListaFechas)
+        in
+            RemovedDuplicates, 
+        MyReiteros = let
+        Source = Folder.Files(MyRuta&"\CalculoBonificacion\Reitero"),
+        InsertedYear = Table.AddColumn(Source, "Año", each Text.BetweenDelimiters([Name], "_", ".", 1, 0), type text),
+        InsertedMonth = Table.AddColumn(InsertedYear, "Mes", each Text.BetweenDelimiters([Name], "_", "_"), type text),
+        Changed_Type_Date = Table.TransformColumnTypes(InsertedMonth,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
+        Merged_Mes_Actu = Table.NestedJoin(Changed_Type_Date, {"Mes", "Año"}, MyArchivoUtilizar, {"Mes", "Año"}, "Archivos_Utilizar", JoinKind.RightOuter),
+        Filtered_Null_Name = Table.SelectRows(Merged_Mes_Actu, each [Name] <> null and [Name] <> ""),
+        FilteredHiddenFiles = Table.SelectRows(Filtered_Null_Name, each [Attributes]?[Hidden]? <> true),
+        InvokeCustomFunction = Table.AddColumn(FilteredHiddenFiles, "Transformar archivo (2)", each MyTransformaReitero([Content])),
+        RemovedOtherColumns = Table.SelectColumns(InvokeCustomFunction,{"Año", "Mes", "Transformar archivo (2)"}),
+        RemovedErrors = Table.RemoveRowsWithErrors(RemovedOtherColumns, {"Transformar archivo (2)"}),
+        ExpandedTableColumn = Table.ExpandTableColumn(RemovedErrors, "Transformar archivo (2)", Table.ColumnNames(MyTransformaReitero(MyEjemploReitero))),
+        ChangedType = Table.TransformColumnTypes(ExpandedTableColumn,{{"Pet_atis", type text}, {"Identificador_PC_Linea", type text}, {"Fecha_de_cierre_final", type date}, {"Familia", type text}, {"Medio_de_Acceso", type text}, {"external_id", type text}, {"external_id_MTTOA", type text}, {"Departamento", type text}, {"Año", Int64.Type}, {"Mes", Int64.Type}, {"APERTURA_AV", type text}, {"CIERRE_AV", type text}}),
+        MergedExcluir = Table.NestedJoin(ChangedType, {"Medio_de_Acceso", "APERTURA_AV", "Año", "Mes"}, MyCausalesExcluirReitero, {"Acceso", "Causal", "Año", "Mes"}, "CausalesExcluirReitero", JoinKind.LeftOuter),
+        ExpandedExcluir = Table.ExpandTableColumn(MergedExcluir, "CausalesExcluirReitero", {"Excluir"}, {"Excluir"}),
+        ReplacedNullExcluir = Table.ReplaceValue(ExpandedExcluir,null,"NO",Replacer.ReplaceValue,{"Excluir"}),
+        RemovedOtherColumns1 = Table.SelectColumns(ReplacedNullExcluir,{"Pet_atis", "APERTURA_AV", "CIERRE_AV", "Excluir"})
+    in
+        RemovedOtherColumns1,
+        Source = Table.Combine({MyReiteros, MyInfancias}),
+        RemovedDuplicates = Table.Distinct(Source)
+    in
+        RemovedDuplicates,
 // ConsolidadoProduccion
     ConsolidadoProduccion = let
         Source = Cuadrillas,
@@ -191,8 +252,15 @@ in
         Added_Real_Meta_Dia = Table.AddColumn(Added_Meta_Dia, "RealMetaDia", each if([Habil]="Habil")then(if([Cargo]="Supervisor")then(if([AreaCuadri]="MANTENIMIENTO")then([MetaMes])else([Meta Dia]))else([Meta Dia]))else(0), type number),
         Added_Meta_Mostrar = Table.AddColumn(Added_Real_Meta_Dia, "MetaMostrar", each if([Cargo]="Tecnico")then(if([Pre.MetaMostrar]=null)then([RealMetaDia])else([Pre.MetaMostrar]))else([RealMetaDia]), type number),
         Renamed_Columns = Table.RenameColumns(Added_Meta_Mostrar,{{"BonoCuadrilla", "BonoCduarilla"}}),
-        Removed_Other_Columns = Table.SelectColumns(Renamed_Columns,{"Contrata", "Dep Cuadri", "AreaCuadri", "CC Tec", "Nom Tec", "Tipo Cuadrilla", "CC Gest", "Nom Gest", "CC Super", "Nom Super", "Nom Aux", "CC Aux", "Fecha", "Año", "Mes", "Habiles", "Habil", "Tipo Empresa", "Acceso", "Cargo", "ApuCuadrilla", "BonoCduarilla", "IncrementoBono", "MetaMes", "Salario", "Max Porc Bono", "Parte Presta", "Parte Cuadri 2 Per", "Aux.Salario", "Aux.Max Porc Bono", "Aux.Parte Presta", "Aux.Parte Cuadri 2 Per", "Atiempo", "Atis", "Tipo Orden", "Tipo Tarea", "Departamento", "Medio de Acceso", "Baremos", "Actividades", "Recuento", "DiaTrabajado", "Valor Admin", "$Bar Tec", "$Bar Admin", "Trabajado", "Meta Dia", "RealMetaDia", "MetaMostrar"})
+        Removed_Other_Columns = Table.SelectColumns(Renamed_Columns,{"Contrata", "Dep Cuadri", "AreaCuadri", "CC Tec", "Nom Tec", "Tipo Cuadrilla", "CC Gest", "Nom Gest", "CC Super", "Nom Super", "Nom Aux", "CC Aux", "Fecha", "Año", "Mes", "Habiles", "Habil", "Tipo Empresa", "Acceso", "Cargo", "ApuCuadrilla", "BonoCduarilla", "IncrementoBono", "MetaMes", "Salario", "Max Porc Bono", "Parte Presta", "Parte Cuadri 2 Per", "Aux.Salario", "Aux.Max Porc Bono", "Aux.Parte Presta", "Aux.Parte Cuadri 2 Per", "Atiempo", "Atis", "Tipo Orden", "Tipo Tarea", "Departamento", "Medio de Acceso", "Baremos", "Actividades", "Recuento", "DiaTrabajado", "Valor Admin", "$Bar Tec", "$Bar Admin", "Trabajado", "Meta Dia", "RealMetaDia", "MetaMostrar"}),
+        Merged_Calidad_IM = Table.NestedJoin(Removed_Other_Columns, {"Atis"}, Calidad_I_M, {"Pet_atis"}, "Calidad_I_M", JoinKind.LeftOuter),
+        Expanded_Calidad_IM = Table.ExpandTableColumn(Merged_Calidad_IM, "Calidad_I_M", {"APERTURA_AV", "CIERRE_AV", "Excluir"}, {"Calidad_I_M.APERTURA_AV", "Calidad_I_M.CIERRE_AV", "Calidad_I_M.Excluir"}),
+        Replaced_Null_Excluir = Table.ReplaceValue(Expanded_Calidad_IM,null,"Nada",Replacer.ReplaceValue,{"Calidad_I_M.Excluir"}),
+        Added_Afecta_Calidad = Table.AddColumn(Replaced_Null_Excluir, "Afecta Calidad", each if([Calidad_I_M.Excluir]="NO")then("Afecta")else("No Afecta"), type text),
+        Added_Puntos_Colombia = Table.AddColumn(Added_Afecta_Calidad, "Puntos Colombia", each if([Tipo Orden]="AVERIA")then([Actividades]*1.3)else([Baremos]), type number),
+        Added_Dia_No_Tabaja = Table.AddColumn(Added_Puntos_Colombia, "DiaNoTrabajo", each if([Habil]="Habil")and([DiaTrabajado]=null)then(1)else(0), type number),
+        Replaced_Null_Dep = Table.ReplaceValue(Added_Dia_No_Tabaja,null,each [Dep Cuadri],Replacer.ReplaceValue,{"Departamento"})
     in
-        Removed_Other_Columns
+        Replaced_Null_Dep
 in
     ConsolidadoProduccion
