@@ -125,9 +125,10 @@ let
         Merged_Tbl_Bonos = Table.NestedJoin(Replaced_Apu_Cuadrilla, {"Cargo", "AreaCuadri", "Tipo Cuadrilla", "Fecha"}, TblBonos, {"Cargo", "CuadrillaArea", "TipoCuadrilla", "Fecha"}, "TblBonos", JoinKind.LeftOuter),
         Expanded_Tbl_Bonos = Table.ExpandTableColumn(Merged_Tbl_Bonos, "TblBonos", {"BonoCuadrilla", "IncrementoBono", "MetaMes", "Salario", "Max Porc Bono", "Parte Presta", "Parte Cuadri 2 Per", "Aux.Salario", "Aux.Max Porc Bono", "Aux.Parte Presta", "Aux.Parte Cuadri 2 Per"}, {"BonoCuadrilla", "IncrementoBono", "MetaMes", "Salario", "Max Porc Bono", "Parte Presta", "Parte Cuadri 2 Per", "Aux.Salario", "Aux.Max Porc Bono", "Aux.Parte Presta", "Aux.Parte Cuadri 2 Per"}),
         Merged_Meta_Mostrar = Table.NestedJoin(Expanded_Tbl_Bonos, {"Dep Cuadri", "AreaCuadri", "Tipo Cuadrilla", "Fecha"}, TblMetaMostrar, {"Departamento", "CuadrillaArea", "Tipo", "Fecha"}, "TblMetaMostrar", JoinKind.LeftOuter),
-        Expanded_Meta_Mostrar = Table.ExpandTableColumn(Merged_Meta_Mostrar, "TblMetaMostrar", {"MetaMostrar"}, {"Pre.MetaMostrar"})
+        Expanded_Meta_Mostrar = Table.ExpandTableColumn(Merged_Meta_Mostrar, "TblMetaMostrar", {"MetaMostrar"}, {"Pre.MetaMostrar"}),
+        Filtered_Null_Fecha = Table.SelectRows(Expanded_Meta_Mostrar , each [Fecha] <> null and [Fecha] <> "")
     in
-        Expanded_Meta_Mostrar, 
+        Filtered_Null_Fecha, 
 // CantProducionDia
     CantProducionDia = let
     Source = Table.Combine({ProduccionAltas, ProduccionMantenimiento}),
