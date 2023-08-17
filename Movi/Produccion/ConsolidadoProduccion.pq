@@ -198,7 +198,7 @@ in
             Filtered_Null_Name = Table.SelectRows(Merged_Mes_Actu, each [Name] <> null and [Name] <> ""),
             FilteredHiddenFiles = Table.SelectRows(Filtered_Null_Name, each [Attributes]?[Hidden]? <> true),
             InvokeCustomFunction = Table.AddColumn(FilteredHiddenFiles, "Transformar archivo", each MyTransformaInfancia([Content])),
-            RemovedOtherColumns = Table.SelectColumns(InvokeCustomFunction,{"Transformar archivo"}),
+            RemovedOtherColumns = Table.SelectColumns(InvokeCustomFunction,{"Transformar archivo", "Año", "Mes"}),
             RemovedErrors = Table.RemoveRowsWithErrors(RemovedOtherColumns, {"Transformar archivo"}),
             ExpandedTableColumn = Table.ExpandTableColumn(RemovedErrors, "Transformar archivo", Table.ColumnNames(MyTransformaInfancia(MyEjemploInfancia))),
             ChangedType = Table.TransformColumnTypes(ExpandedTableColumn,{{"XA_ACTUACION_ALTA", type text}, {"Pet_atis_ALTA", type text}, {"PRODUCTO", type text}, {"Medio_de_Acceso_ALTA", type text}, {"Fecha_de_cierre_final_ALTA", type date}, {"external_id", type text}, {"Departamento", type text}, {"Año", Int64.Type}, {"Mes", Int64.Type}, {"APERTURA_AV", type text}, {"CIERRE_AV", type text}}),
