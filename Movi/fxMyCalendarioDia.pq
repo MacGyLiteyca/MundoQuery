@@ -2,7 +2,7 @@
 let 
     fxMiCalendarioDia = (TablaReferencia as table, NombreColumnaInicial as text, NombreColumnaFinal as text) => let
     //Tabla inicial
-        Source = TablaReferencia,
+        Source = try(Table.RemoveColumns(TablaReferencia,{"Año", "Mes"}))otherwise(TablaReferencia),
     //Columna de fecha inicial
         FechaMenor = NombreColumnaInicial,
     //Columna de fecha final

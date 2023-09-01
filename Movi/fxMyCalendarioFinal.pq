@@ -103,23 +103,23 @@ in
     fxFestivo, 
     fxMiCalendarioFinal = (TablaReferencia as table, NombreColumnaInicial as text, NombreColumnaFinal as text) => let
     //Tabla inicial
-        Source = TablaReferencia,
+        Source = try(Table.RemoveColumns(TablaReferencia,{"Año", "Mes"}))otherwise(TablaReferencia),
     //Columna de fecha inicial
         FechaMenor = NombreColumnaInicial,
     //Columna de fecha final
         FechaMayor= NombreColumnaFinal,
     //Se duplica la columna de fecha menor
-        Duplicated_Inicial = Table.DuplicateColumn(Source, FechaMenor, "FechaMin"),
+        Duplicated_Inicial = Table.DuplicateColumn(Source, FechaMenor, "Fecha_Minima_Duplicada"),
     //Se obtiene la menor fecha como variable
-        FechaInicial = List.Min(Duplicated_Inicial[FechaMin]),
+        FechaInicial = List.Min(Duplicated_Inicial[Fecha_Minima_Duplicada]),
     //Se duplica la columna de fecha mayor
-        Duplicated_Final = Table.DuplicateColumn(Duplicated_Inicial, FechaMayor, "FechaMax"),
+        Duplicated_Final = Table.DuplicateColumn(Duplicated_Inicial, FechaMayor, "Fecha_Maxima_Duplicada"),
     //Se obtiene la mayor fecha como variable
-        FechaFinal = List.Max(Duplicated_Final[FechaMax]),
+        FechaFinal = List.Max(Duplicated_Final[Fecha_Maxima_Duplicada]),
     //Se obtiene la tabla de festivos
         TBLFestivos = fxFestivo("Colombia", Date.Year(FechaInicial), Date.Year(FechaFinal)),
     //Se agrupa para obtener las fechas inicial y final en una tabla
-        Grouped_Rows_Lim_Fechas = Table.Group(Duplicated_Final, {}, {{"Menor Fecha", each List.Min([FechaMin]), type nullable date}, {"Mayor Fecha", each List.Max([FechaMax]), type nullable date}}),
+        Grouped_Rows_Lim_Fechas = Table.Group(Duplicated_Final, {}, {{"Menor Fecha", each List.Min([Fecha_Minima_Duplicada]), type nullable date}, {"Mayor Fecha", each List.Max([Fecha_Maxima_Duplicada]), type nullable date}}),
     //Se saca la primera fecha del año para la fecha minima
         Calculated_Start_Year = Table.TransformColumns(Grouped_Rows_Lim_Fechas,{{"Menor Fecha", Date.StartOfYear, type date}}),
     //Se saca la ultima fecha del año para la fecha maxima
@@ -151,7 +151,7 @@ in
     //Se expande lo agrupado, esta es la tabla final con el calendario completo
         Expanded_All = Table.ExpandTableColumn(Grouped_Rows, "All", {"Fechas_Lim", "Nombre del día", "Descripción", "Habil"}, {"Fechas_Lim", "Nombre del día", "Descripción", "Habil"}),
     //Se retoma desde el paso Duplicated_Final y se le agrega la fecha
-        Added_Fecha = Table.AddColumn(Duplicated_Final, "Fecha", each if([FechaMin]<[FechaMax])then({Number.From([FechaMin])..Number.From([FechaMax])})else({Number.From([FechaMax])..Number.From([FechaMin])})),
+        Added_Fecha = Table.AddColumn(Duplicated_Final, "Fecha", each if([Fecha_Minima_Duplicada]<[Fecha_Maxima_Duplicada])then({Number.From([Fecha_Minima_Duplicada])..Number.From([Fecha_Maxima_Duplicada])})else({Number.From([Fecha_Maxima_Duplicada])..Number.From([Fecha_Minima_Duplicada])})),
     //Se expande la fecha
         Expanded_Fecha = Table.ExpandListColumn(Added_Fecha, "Fecha"),
     //Se cambia al tipo de datos date la columna fecha
@@ -161,7 +161,7 @@ in
     //Se expande el calendario
         Expanded_Year_All = Table.ExpandTableColumn(Merged_Year_All, "CalendarioFinal", {"Año", "Mes", "Dias Mes", "Habiles", "Festivos", "Nombre del día", "Descripción", "Habil"}, {"Año", "Mes", "Dias Mes", "Habiles", "Festivos", "Nombre del día", "Descripción", "Habil"}),
     //Se quitan las fechas utilizadas como referencia
-        Removed_Columns_Fechas = Table.RemoveColumns(Expanded_Year_All,{FechaMenor, FechaMayor, "FechaMin", "FechaMax"})
+        Removed_Columns_Fechas = Table.RemoveColumns(Expanded_Year_All,{FechaMenor, FechaMayor, "Fecha_Minima_Duplicada", "Fecha_Maxima_Duplicada"})
     in
         Removed_Columns_Fechas
 in
