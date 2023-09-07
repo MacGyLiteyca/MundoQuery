@@ -44,8 +44,8 @@ let
 
     Tbl_Departamentos = let
         Source = Tablas_Base,
-        #"Filtered Rows" = Source{[Item="TblDepartamentos"]}[Data],
-        Trimmed_Departamento = Table.TransformColumns(#"Filtered Rows",{{"Departamento", Text.Trim, type text}}),
+        Filtered_Rows = Source{[Item="TblDepartamentos"]}[Data],
+        Trimmed_Departamento = Table.TransformColumns(Filtered_Rows,{{"Departamento", Text.Trim, type text}}),
         Cleaned_Departamento = Table.TransformColumns(Trimmed_Departamento,{{"Departamento", Text.Clean, type text}}),
         Capitalized_Departamento = Table.TransformColumns(Cleaned_Departamento,{{"Departamento", Text.Proper, type text}}),
         Invoke_fxCalendario_Mes = fxMiCalendarioMes(Capitalized_Departamento, "FechaInicio", "FechaFin"),
@@ -198,8 +198,12 @@ let
         Merged_Group_Dias_Tabajo = Table.NestedJoin(Grouped_Rows_Puntos, {"Departamento", "Area", "CC Tec", "Año", "Mes", "Nom Gestor", "Nom Super", "AreaCuadri", "Dep Cuadri", "Contrata"}, Grouped_Rows_Dias_Tabajo, {"Departamento", "Area", "CC Tec", "Año", "Mes", "Nom Gestor", "Nom Super", "AreaCuadri", "Dep Cuadri", "Contrata"}, "RangosTesa", JoinKind.LeftOuter),
         Expanded_Dias_Trabajo = Table.ExpandTableColumn(Merged_Group_Dias_Tabajo, "RangosTesa", {"Dias Trabajado"}, {"Dias Trabajado"}),
         Added_Diario_Puntos = Table.AddColumn(Expanded_Dias_Trabajo, "Diario Puntos", each [Puntos]/[Dias Trabajado], type number),
-        Added_Clasificacion = Table.AddColumn(Added_Diario_Puntos, "Clasificacion", each if [Diario Puntos] >= 8 then "Alto" else if [Diario Puntos] <= 6.0 then "Bajo" else "Medio", type text),
-        Added_Clasificacion_Insta = Table.AddColumn(Added_Clasificacion, "ClasificacionInsta", each if [Diario Puntos] >= 9.5 then "Alto" else if [Diario Puntos] <= 6 then "Bajo" else "Medio", type text),
+        Merged_Limites_Rangos_Tesa = Table.NestedJoin(Added_Diario_Puntos, {"AreaCuadri", "Año", "Mes"}, Limites_Rangos_Tesa, {"Area", "Año", "Mes"}, "Limites_Rangos_Tesa", JoinKind.LeftOuter),
+        Expanded_Limites_Rangos_Tesa = Table.ExpandTableColumn(Merged_Limites_Rangos_Tesa, "Limites_Rangos_Tesa", {"Valor Alto", "Valor Bajo"}, {"Valor Alto", "Valor Bajo"}),
+        Replaced_Null_Valor_Alto = Table.ReplaceValue(Expanded_Limites_Rangos_Tesa,null,7.5,Replacer.ReplaceValue,{"Valor Alto"}),
+        Replaced_Null_Valor_Bajo = Table.ReplaceValue(Replaced_Null_Valor_Alto,null,6.5,Replacer.ReplaceValue,{"Valor Bajo"}),
+        Added_Clasificacion = Table.AddColumn(Replaced_Null_Valor_Bajo, "Clasificacion", each if [Diario Puntos] >= [Valor Alto] then "Alto" else if [Diario Puntos] <= [Valor Bajo] then "Bajo" else "Medio", type text),
+        Added_Clasificacion_Insta = Table.AddColumn(Added_Clasificacion, "ClasificacionInsta", each if [Diario Puntos] >= [Valor Alto] then "Alto" else if [Diario Puntos] <= [Valor Bajo] then "Bajo" else "Medio", type text),
         Added_Orden = Table.AddColumn(Added_Clasificacion_Insta, "Orden", each if [Clasificacion] = "Bajo" then 1 else if [Clasificacion] = "Medio" then 2 else if [Clasificacion] = "Alto" then 3 else 4, type number),
         Added_Mes_Año = Table.AddColumn(Added_Orden, "Mes Año", each Text.From([Año]) & " " & Text.From([Mes]), type text),
         Merged_Acceso_Cuadrillas = Table.NestedJoin(Added_Mes_Año, {"CC Tec", "Año", "Mes"}, AccesosCuadrillas_2, {"CCTec", "Año", "Mes"}, "AccesosCuadrillas", JoinKind.LeftOuter),
@@ -231,8 +235,8 @@ let
 
     AccesosCuadrillas_2 = let
         Source = Tablas_Base,
-        #"Filtered Rows" = Source{[Item="AccesosCuadrillas_2"]}[Data],
-        Trimmed_Text = Table.TransformColumns(#"Filtered Rows",{{"Area Cuadri", Text.Trim, type text}, {"Nom Super", Text.Trim, type text}, {"Nom Gestor", Text.Trim, type text}, {"Nom Tec", Text.Trim, type text}, {"Contrata", Text.Trim, type text}, {"Departamento", Text.Trim, type text}, {"Cargo", Text.Trim, type text}}),
+        Filtered_Rows = Source{[Item="AccesosCuadrillas_2"]}[Data],
+        Trimmed_Text = Table.TransformColumns(Filtered_Rows,{{"Area Cuadri", Text.Trim, type text}, {"Nom Super", Text.Trim, type text}, {"Nom Gestor", Text.Trim, type text}, {"Nom Tec", Text.Trim, type text}, {"Contrata", Text.Trim, type text}, {"Departamento", Text.Trim, type text}, {"Cargo", Text.Trim, type text}}),
         Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Area Cuadri", Text.Clean, type text}, {"Nom Super", Text.Clean, type text}, {"Nom Gestor", Text.Clean, type text}, {"Nom Tec", Text.Clean, type text}, {"Contrata", Text.Clean, type text}, {"Departamento", Text.Clean, type text}, {"Cargo", Text.Clean, type text}}),
         Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"Area Cuadri", Text.Proper, type text}, {"Nom Super", Text.Proper, type text}, {"Nom Gestor", Text.Proper, type text}, {"Nom Tec", Text.Proper, type text}, {"Contrata", Text.Proper, type text}, {"Departamento", Text.Proper, type text}, {"Cargo", Text.Proper, type text}}),
         Invoke_fxCalendario_Dia = fxMiCalendarioDia(Capitalized_Each_Word, "FechaMin", "FechaMax"),
@@ -244,8 +248,8 @@ let
 
     Tbl_Bonos = let
         Source = Tablas_Base,
-        #"Filtered Rows" = Source{[Item="TblBonos"]}[Data],
-        Trimmed_Text = Table.TransformColumns(#"Filtered Rows",{{"Cargo", Text.Trim, type text}, {"CuadrillaArea", Text.Trim, type text}, {"TipoCuadrilla", Text.Trim, type text}}),
+        Filtered_Rows = Source{[Item="TblBonos"]}[Data],
+        Trimmed_Text = Table.TransformColumns(Filtered_Rows,{{"Cargo", Text.Trim, type text}, {"CuadrillaArea", Text.Trim, type text}, {"TipoCuadrilla", Text.Trim, type text}}),
         Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Cargo", Text.Clean, type text}, {"CuadrillaArea", Text.Clean, type text}, {"TipoCuadrilla", Text.Clean, type text}}),
         Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"Cargo", Text.Proper, type text}, {"CuadrillaArea", Text.Proper, type text}, {"TipoCuadrilla", Text.Proper, type text}}),
         Invoke_fxCalendario_Mes = fxMiCalendarioMes(Capitalized_Each_Word, "FechaInicio", "FechaFin"),
@@ -260,14 +264,27 @@ let
 
     Tbl_Meta_Mostrar = let
         Source = Tablas_Base,
-        #"Filtered Rows" = Source{[Item="TblMetaMostrar"]}[Data],
-        Trimmed_Text = Table.TransformColumns(#"Filtered Rows",{{"Departamento", Text.Trim, type text}, {"CuadrillaArea", Text.Trim, type text}, {"Tipo", Text.Trim, type text}}),
+        Filtered_Rows = Source{[Item="TblMetaMostrar"]}[Data],
+        Trimmed_Text = Table.TransformColumns(Filtered_Rows,{{"Departamento", Text.Trim, type text}, {"CuadrillaArea", Text.Trim, type text}, {"Tipo", Text.Trim, type text}}),
         Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Departamento", Text.Clean, type text}, {"CuadrillaArea", Text.Clean, type text}, {"Tipo", Text.Clean, type text}}),
         Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"Departamento", Text.Proper, type text}, {"CuadrillaArea", Text.Proper, type text}, {"Tipo", Text.Proper, type text}}),
         Invoke_fxCalendario_Mes = fxMiCalendarioMes(Capitalized_Each_Word, "FechaInicio", "FechaFin"),
         Merged_Mes_Act = Table.NestedJoin(Invoke_fxCalendario_Mes, {"Mes", "Año"}, Mes_Actualizar, {"Mes", "Año"}, "Mes_Actualizar", JoinKind.RightOuter),
         Filtered_Null_Departamento = Table.SelectRows(Merged_Mes_Act, each [Departamento] <> null and [Departamento] <> ""),
         Removed_Column_Mes_Act = Table.RemoveColumns(Filtered_Null_Departamento,{"Mes_Actualizar"})
+    in
+        Removed_Column_Mes_Act,
+
+    Limites_Rangos_Tesa = let
+        Source = Tablas_Base,
+        Filtered_Rows = Source{[Item="Limites_Rangos_Tesa"]}[Data],
+        Trimmed = Table.TransformColumns(Filtered_Rows,{{"Area", Text.Trim, type text}}),
+        Cleaned = Table.TransformColumns(Trimmed,{{"Area", Text.Clean, type text}}),
+        Capitalized = Table.TransformColumns(Cleaned,{{"Area", Text.Proper, type text}}),
+        Invoke_fxCalendario_Mes = fxMiCalendarioMes(Capitalized, "FechaInicio", "FechaFin"),
+        Merged_Mes_Act = Table.NestedJoin(Invoke_fxCalendario_Mes, {"Mes", "Año"}, Mes_Actualizar, {"Mes", "Año"}, "Mes_Actualizar", JoinKind.RightOuter),
+        Filtered_Null_Area = Table.SelectRows(Merged_Mes_Act, each [Area] <> null and [Area] <> ""),
+        Removed_Column_Mes_Act = Table.RemoveColumns(Filtered_Null_Area,{"Mes_Actualizar"})
     in
         Removed_Column_Mes_Act
 in
