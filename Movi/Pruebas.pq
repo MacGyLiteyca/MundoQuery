@@ -1,17 +1,13 @@
-let
-    My_Fx_Reemplazo_Nombres = (Tabla_Inicial as table, CC_Cruzar as text, Nom_Cambiar as text, Tabla_Datos as table, CC_Datos as text, NomOficial as text) =>
-    let     
-        Merged_Querie_1 = Table.NestedJoin(Tabla_Inicial, {CC_Cruzar}, Tabla_Datos, {CC_Datos}, "Nombres_Consolidado", JoinKind.LeftOuter),
-        Expanded_Querie_1 = Table.ExpandTableColumn(Merged_Querie_1, "Nombres_Consolidado", {NomOficial}, {"Nombre_Oficial"}),
-        Removed_Columns_Originales = Table.RemoveColumns(Expanded_Querie_1,{Nom_Cambiar}),
-        Renamed_Columns_Secundarias = Table.RenameColumns(Removed_Columns_Originales,{{"Nombre_Oficial", Nom_Cambiar}}),
-        Replaced_Null_Value = Table.ReplaceValue(Renamed_Columns_Secundarias,null,"Desconocido",Replacer.ReplaceValue,{Nom_Cambiar})
-    in 
-        Replaced_Null_Value
+[
+Tablas_Base = let
+    Source = ProduccionTecnicos,
+    Filtered_Extension = Table.SelectRows(Source, each [Extension] = ".xlsx"),
+    Filtered_Folder = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\VersionesBI\V12 Mac\")),
+    Filtered_Name = Table.SelectRows(Filtered_Folder, each Text.StartsWith([Name], "Tablas Base")),
+    Removed_Other_Columns = Table.SelectColumns(Filtered_Name,{"Content"}),
+    Transform_Content = Table.TransformColumns(Removed_Other_Columns, {"Content", each Excel.Workbook(_)}),
+    Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"Name", "Data", "Item", "Kind", "Hidden"}, {"Name", "Data", "Item", "Kind", "Hidden"}),
+    Filtered_Kind_Table = Table.SelectRows(Expanded_Content, each [Kind] = "Table")
 in
-    My_Fx_Reemplazo_Nombres
-
-
-
-
-//= My_Fx_Reemplazo_Nombres(Reemplazar_Nom_Gest, "CC Super", "Nom Super", Con_Nombres_Consolidado, "CC", "Nombre_Oficial")
+    Filtered_Kind_Table
+]
