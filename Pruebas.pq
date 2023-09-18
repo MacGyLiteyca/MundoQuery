@@ -1,274 +1,468 @@
+// ProduccionTecnicos
 let
-    Produccion_Altas = let
-        Source = ProduccionTecnicos,
-        Filtered_Extension = Table.SelectRows(Source, each ([Extension] = ".xlsb")),
-        Filtered_Folder_Path = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\DatasProduccion\")),
-        Added_Year = Table.AddColumn(Filtered_Folder_Path, "Año", each Text.BetweenDelimiters([Name], " ", "_", 2, 0), type text),
-        Added_Mes = Table.AddColumn(Added_Year, "Mes", each Text.BetweenDelimiters([Name], "_", " "), type text),
-        Changed_Type_Date = Table.TransformColumnTypes(Added_Mes,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
-        Merged_Mes_Actu = Table.NestedJoin(Changed_Type_Date, {"Mes", "Año"}, Mes_Actualizar, {"Mes", "Año"}, "Mes_Actualizar", JoinKind.RightOuter),
-        Filtered_Null_Name = Table.SelectRows(Merged_Mes_Actu, each [Name] <> null and [Name] <> ""),
-        Transform_Content = Table.TransformColumns(Filtered_Null_Name, {"Content", each Excel.Workbook(_)}),
-        Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"Name", "Data"}, {"Content.Name", "Content.Data"}),
-        Expanded_Produccion = Expanded_Content{[Content.Name="Produccion"]}[Content.Data],
-        Promoted_Headers = Table.PromoteHeaders(Expanded_Produccion, [PromoteAllScalars=true]),
-        Filtered_Null_Fecha = Table.SelectRows(Promoted_Headers, each [Fecha de cierre] <> null and [Fecha de cierre] <> ""),
-        Transform_Fecha = Table.TransformColumns(Filtered_Null_Fecha,{{"Fecha de cierre", each Date.From(Value.FromText(_)), type date}}),
-        Removed_Other_Columns = Table.SelectColumns(Transform_Fecha,{"id_actuacion", "pedido_atis", "Tipo Actuacion", "Tipo Tarea", "Departamento", "Num Empleado", "Fecha de cierre", "TIPO DE RED", "TOTAL BAREMOS"}),
-        Changed_Type = Table.TransformColumnTypes(Removed_Other_Columns,{{"id_actuacion", type text}, {"pedido_atis", type text}, {"Tipo Actuacion", type text}, {"Tipo Tarea", type text}, {"Departamento", type text}, {"Num Empleado", type text}, {"Fecha de cierre", type date}, {"TIPO DE RED", type text}, {"TOTAL BAREMOS", type number}}),
-        Trimmed_Text = Table.TransformColumns(Changed_Type,{{"Tipo Tarea", Text.Trim, type text}, {"Departamento", Text.Trim, type text}, {"TIPO DE RED", Text.Trim, type text}, {"Tipo Actuacion", Text.Trim, type text}}),
-        Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Tipo Tarea", Text.Clean, type text}, {"Departamento", Text.Clean, type text}, {"TIPO DE RED", Text.Clean, type text}, {"Tipo Actuacion", Text.Clean, type text}}),
-        Capitalized_Departamento = Table.TransformColumns(Cleaned_Text,{{"Departamento", Text.Proper, type text}}),
-        Renamed_Columns = Table.RenameColumns(Capitalized_Departamento,{{"pedido_atis", "Atis"}, {"id_actuacion", "Atiempo"}, {"Num Empleado", "CC Tec"}, {"Fecha de cierre", "Fecha"}, {"Tipo Actuacion", "Tipo Orden"}, {"TOTAL BAREMOS", "Baremos"}, {"TIPO DE RED", "Medio de Acceso"}}),
-        Filtered_Null_Atis = Table.SelectRows(Renamed_Columns, each [Atis] <> null and [Atis] <> ""),
-        Filtered_Null_CC_Tec = Table.SelectRows(Filtered_Null_Atis, each [CC Tec] <> null and [CC Tec] <> ""),
-        Added_Area_Cuadri = Table.AddColumn(Filtered_Null_CC_Tec, "AreaCuadri", each "Instalaciones", type text),
-        Merged_Tbl_Departamentos = Table.NestedJoin(Added_Area_Cuadri, {"Departamento"}, Tbl_Departamentos, {"Departamento"}, "TblDepartamentos", JoinKind.RightOuter),
-        Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Departamentos, each [Departamento] <> null and [Departamento] <> ""),
-        Removed_Columns = Table.RemoveColumns(Filtered_Null_Dep,{"TblDepartamentos"}),
-        Removed_Duplicates = Table.Distinct(Removed_Columns)
-    in
-        Removed_Duplicates,
-
-    Tablas_Base = let
-        Source = ProduccionTecnicos,
-        Filtered_Extension = Table.SelectRows(Source, each [Extension] = ".xlsx"),
-        Filtered_Folder = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\VersionesBI\V12 Mac\")),
-        Filtered_Name = Table.SelectRows(Filtered_Folder, each Text.StartsWith([Name], "Tablas Base")),
-        Removed_Other_Columns = Table.SelectColumns(Filtered_Name,{"Content"}),
-        Transform_Content = Table.TransformColumns(Removed_Other_Columns, {"Content", each Excel.Workbook(_)}),
-        Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"Name", "Data", "Item", "Kind", "Hidden"}, {"Name", "Data", "Item", "Kind", "Hidden"}),
-        Filtered_Kind_Table = Table.SelectRows(Expanded_Content, each [Kind] = "Table")
-    in
-        Filtered_Kind_Table,
-
-    Tbl_Departamentos = let
-        Source = Tablas_Base,
-        #"Filtered Rows" = Source{[Item="TblDepartamentos"]}[Data],
-        Trimmed_Departamento = Table.TransformColumns(#"Filtered Rows",{{"Departamento", Text.Trim, type text}}),
-        Cleaned_Departamento = Table.TransformColumns(Trimmed_Departamento,{{"Departamento", Text.Clean, type text}}),
-        Capitalized_Departamento = Table.TransformColumns(Cleaned_Departamento,{{"Departamento", Text.Proper, type text}}),
-        Invoke_fxCalendario_Mes = fxMiCalendarioMes(Capitalized_Departamento, "FechaInicio", "FechaFin"),
-        Merged_Mes_Act = Table.NestedJoin(Invoke_fxCalendario_Mes, {"Mes", "Año"}, Mes_Actualizar, {"Mes", "Año"}, "Mes_Actualizar", JoinKind.RightOuter),
-        Filtered_Null_Departamento = Table.SelectRows(Merged_Mes_Act, each [Departamento] <> null and [Departamento] <> ""),
-        Removed_Column_Mes_Act = Table.RemoveColumns(Filtered_Null_Departamento,{"Mes_Actualizar"})
-    in
-        Removed_Column_Mes_Act,
-
-    Produccion_Mantenimiento = let
-        Source = ProduccionTecnicos,
-        Filtered_Extension = Table.SelectRows(Source, each ([Extension] = ".xlsb")),
-        Filtered_Folder_Path = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\DatasProduccionMantenimiento\")),
-        Added_Year = Table.AddColumn(Filtered_Folder_Path, "Año", each Text.BetweenDelimiters([Name], " ", "_", 2, 0), type text),
-        Added_Mes = Table.AddColumn(Added_Year, "Mes", each Text.BetweenDelimiters([Name], "_", " "), type text),
-        Changed_Type_Date = Table.TransformColumnTypes(Added_Mes,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
-        Merged_Mes_Actu = Table.NestedJoin(Changed_Type_Date, {"Mes", "Año"}, Mes_Actualizar, {"Mes", "Año"}, "Mes_Actualizar", JoinKind.RightOuter),
-        Filtered_Null_Name = Table.SelectRows(Merged_Mes_Actu, each [Name] <> null and [Name] <> ""),
-        Transform_Content = Table.TransformColumns(Filtered_Null_Name, {"Content", each Excel.Workbook(_)}),
-        Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"Name", "Data"}, {"Content.Name", "Content.Data"}),
-        Expanded_Base = Expanded_Content{[Content.Name="BASE"]}[Content.Data],
-        Promoted_Headers = Table.PromoteHeaders(Expanded_Base, [PromoteAllScalars=true]),
-        Filtered_Null_Fecha = Table.SelectRows(Promoted_Headers, each [Fecha_de_cierre_final] <> null and [Fecha_de_cierre_final] <> ""),
-        Transform_Fecha = Table.TransformColumns(Filtered_Null_Fecha,{{"Fecha_de_cierre_final", each Date.From(Value.FromText(_)), type date}}),
-        Removed_Other_Columns = Table.SelectColumns(Transform_Fecha,{"Tipo_de_orden", "Subtipo_de_orden", "Pet_atis", "Identificador_PC_Linea", "Departamento", "external_id", "Fecha_de_cierre_final"}),
-        Changed_Type = Table.TransformColumnTypes(Removed_Other_Columns,{{"Tipo_de_orden", type text}, {"Subtipo_de_orden", type text}, {"Pet_atis", type text}, {"Identificador_PC_Linea", type text}, {"Departamento", type text}, {"external_id", type text}, {"Fecha_de_cierre_final", type date}}),
-        Trimmed_Text = Table.TransformColumns(Changed_Type,{{"Tipo_de_orden", Text.Trim, type text}, {"Subtipo_de_orden", Text.Trim, type text}, {"Departamento", Text.Trim, type text}}),
-        Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Tipo_de_orden", Text.Clean, type text}, {"Subtipo_de_orden", Text.Clean, type text}, {"Departamento", Text.Clean, type text}}),
-        Capitalized_Departamento = Table.TransformColumns(Cleaned_Text,{{"Departamento", Text.Proper, type text}}),
-        Renamed_Columns = Table.RenameColumns(Capitalized_Departamento,{{"Pet_atis", "Atis"}, {"Identificador_PC_Linea", "Atiempo"}, {"Tipo_de_orden", "Tipo Orden"}, {"external_id", "CC Tec"}, {"Fecha_de_cierre_final", "Fecha"}, {"Subtipo_de_orden", "Tipo Tarea"}}),
-        Filtered_Null_Atis = Table.SelectRows(Renamed_Columns, each [Atis] <> null and [Atis] <> ""),
-        Filtered_Null_CC_Tec = Table.SelectRows(Filtered_Null_Atis, each [CC Tec] <> null and [CC Tec] <> ""),
-        Added_Area_Cuadri = Table.AddColumn(Filtered_Null_CC_Tec, "AreaCuadri", each "Mantenimiento", type text),
-        Merged_Tbl_Departamentos = Table.NestedJoin(Added_Area_Cuadri, {"Departamento"}, Tbl_Departamentos, {"Departamento"}, "TblDepartamentos", JoinKind.RightOuter),
-        Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Departamentos, each [Departamento] <> null and [Departamento] <> ""),
-        Removed_Columns = Table.RemoveColumns(Filtered_Null_Dep,{"TblDepartamentos"}),
-        Removed_Duplicates = Table.Distinct(Removed_Columns),
-        Added_Actividades = Table.AddColumn(Removed_Duplicates, "Actividades", each 1, type number)
-    in
-        Added_Actividades,
-
-    Produccion = let
-        Source = Table.Combine({Produccion_Altas, Produccion_Mantenimiento}),
-        Filtered_Null_Dep = Table.SelectRows(Source, each [Departamento] <> null and [Departamento] <> ""),
-        Replaced_Null_Bar_Act = Table.ReplaceValue(Filtered_Null_Dep,null,0,Replacer.ReplaceValue,{"Baremos", "Actividades"}),
-        Merged_Cant_Por_Dia = Table.NestedJoin(Replaced_Null_Bar_Act, {"CC Tec", "Fecha"}, Cant_Producion_Dia, {"CC Tec", "Fecha"}, "CantProducionDia", JoinKind.LeftOuter),
-        Expanded_Recuento = Table.ExpandTableColumn(Merged_Cant_Por_Dia, "CantProducionDia", {"Recuento", "DiaTrabajado"}, {"Recuento", "DiaTrabajado"}),
-        Appended_Cuadrillas_Sin_Produccion = Table.Combine({Expanded_Recuento, Cuadrillas_Sin_Produccion})
-    in
-        Appended_Cuadrillas_Sin_Produccion,
-
-    Cant_Producion_Dia = let
-        Source = Table.Combine({Produccion_Altas, Produccion_Mantenimiento}),
-        Grouped_Rows = Table.Group(Source, {"CC Tec", "Fecha"}, {{"Recuento", each Table.RowCount(_), Int64.Type}}),
-        Added_Dia_Trabajado = Table.AddColumn(Grouped_Rows, "DiaTrabajado", each 1/[Recuento], type number)
-    in
-        Added_Dia_Trabajado,
-
-    Consolidado_Cuadrillas = let
-        Source = ProduccionTecnicos,
-        Filtered_Extension = Table.SelectRows(Source, each ([Extension] = ".xlsb")),
-        Filtered_Folder_Path = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\DatasProduccion\")),
-        Added_Year = Table.AddColumn(Filtered_Folder_Path, "Año", each Text.BetweenDelimiters([Name], " ", "_", 2, 0), type text),
-        Added_Mes = Table.AddColumn(Added_Year, "Mes", each Text.BetweenDelimiters([Name], "_", " "), type text),
-        Changed_Type_Date = Table.TransformColumnTypes(Added_Mes,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
-        Merged_Mes_Actu = Table.NestedJoin(Changed_Type_Date, {"Mes", "Año"}, Mes_Actualizar, {"Mes", "Año"}, "Mes_Actualizar", JoinKind.RightOuter),
-        Filtered_Null_Name = Table.SelectRows(Merged_Mes_Actu, each [Name] <> null and [Name] <> ""),
-        Transform_Content = Table.TransformColumns(Filtered_Null_Name, {"Content", each Excel.Workbook(_)}),
-        Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"Name", "Data"}, {"Content.Name", "Content.Data"}),
-        Expanded_Cuadrillas = Expanded_Content{[Content.Name="Cuadrillas"]}[Content.Data],
-        Promoted_Headers = Table.PromoteHeaders(Expanded_Cuadrillas, [PromoteAllScalars=true]),
-        Filtered_Null_Fecha = Table.SelectRows(Promoted_Headers, each [Fecha Inicial] <> null and [Fecha Inicial] <> ""),
-        Transform_Fecha = Table.TransformColumns(Filtered_Null_Fecha,{{"Fecha Inicial", each Date.From(Value.FromText(_)), type date}, {"Fecha Final", each Date.From(Value.FromText(_)), type date}}),
-        Removed_Other_Columns = Table.SelectColumns(Transform_Fecha,{"EMPRESA", "DEPARTAMENTO", "AREA", "AREA DE COBERTURA", "CEDULA TECNICO", "NOMBRE TECNICO", "TIPO CUADRILLA", "ID RECURSO TOA", "CEDULA AUXILIAR", "NOMBRE AUXILIAR", "PROYECTO", "HABILIDAD", "CEDULA AUX GESTION", "AUXILIAR DE GESTION", "CEDULA SUPERVISOR", "SUPERVISOR", "CEDULA LIDER ", "LIDER DE GESTION", "CEDULA PROFESIONAL", "PROFESIONAL", "Fecha Inicial", "Fecha Final"}),
-        Changed_Type = Table.TransformColumnTypes(Removed_Other_Columns,{{"EMPRESA", type text}, {"DEPARTAMENTO", type text}, {"AREA", type text}, {"AREA DE COBERTURA", type text}, {"CEDULA TECNICO", type text}, {"NOMBRE TECNICO", type text}, {"TIPO CUADRILLA", type text}, {"ID RECURSO TOA", type text}, {"CEDULA AUXILIAR", type text}, {"NOMBRE AUXILIAR", type text}, {"PROYECTO", type text}, {"HABILIDAD", type text}, {"CEDULA AUX GESTION", type text}, {"AUXILIAR DE GESTION", type text}, {"CEDULA SUPERVISOR", type text}, {"SUPERVISOR", type text}, {"CEDULA LIDER ", type text}, {"LIDER DE GESTION", type text}, {"CEDULA PROFESIONAL", type text}, {"PROFESIONAL", type text}, {"Fecha Inicial", type date}, {"Fecha Final", type date}}),
-        Replaced_To_Null_1 = Table.ReplaceValue(Changed_Type,"NO TIENE",null,Replacer.ReplaceValue,{"EMPRESA", "DEPARTAMENTO", "AREA", "AREA DE COBERTURA", "CEDULA TECNICO", "NOMBRE TECNICO", "CEDULA AUXILIAR", "NOMBRE AUXILIAR", "CEDULA AUX GESTION", "AUXILIAR DE GESTION", "CEDULA SUPERVISOR", "SUPERVISOR", "CEDULA LIDER ", "LIDER DE GESTION", "CEDULA PROFESIONAL", "PROFESIONAL"}),
-        Replaced_To_Null_2 = Table.ReplaceValue(Replaced_To_Null_1,"0",null,Replacer.ReplaceValue,{"EMPRESA", "DEPARTAMENTO", "AREA", "AREA DE COBERTURA", "CEDULA TECNICO", "NOMBRE TECNICO", "CEDULA AUXILIAR", "NOMBRE AUXILIAR", "CEDULA AUX GESTION", "AUXILIAR DE GESTION", "CEDULA SUPERVISOR", "SUPERVISOR", "CEDULA LIDER ", "LIDER DE GESTION", "CEDULA PROFESIONAL", "PROFESIONAL"}),
-        Replaced_To_Null_3 = Table.ReplaceValue(Replaced_To_Null_2,"NA",null,Replacer.ReplaceValue,{"EMPRESA", "DEPARTAMENTO", "AREA", "AREA DE COBERTURA", "CEDULA TECNICO", "NOMBRE TECNICO", "CEDULA AUXILIAR", "NOMBRE AUXILIAR", "CEDULA AUX GESTION", "AUXILIAR DE GESTION", "CEDULA SUPERVISOR", "SUPERVISOR", "CEDULA LIDER ", "LIDER DE GESTION", "CEDULA PROFESIONAL", "PROFESIONAL"}),
-        Replaced_To_Null_4 = Table.ReplaceValue(Replaced_To_Null_3,"",null,Replacer.ReplaceValue,{"EMPRESA", "DEPARTAMENTO", "AREA", "AREA DE COBERTURA", "CEDULA TECNICO", "NOMBRE TECNICO", "CEDULA AUXILIAR", "NOMBRE AUXILIAR", "CEDULA AUX GESTION", "AUXILIAR DE GESTION", "CEDULA SUPERVISOR", "SUPERVISOR", "CEDULA LIDER ", "LIDER DE GESTION", "CEDULA PROFESIONAL", "PROFESIONAL"}),
-        Replaced_To_Null_5 = Table.ReplaceValue(Replaced_To_Null_4,"NO APLICA",null,Replacer.ReplaceValue,{"EMPRESA", "DEPARTAMENTO", "AREA", "AREA DE COBERTURA", "CEDULA TECNICO", "NOMBRE TECNICO", "CEDULA AUXILIAR", "NOMBRE AUXILIAR", "CEDULA AUX GESTION", "AUXILIAR DE GESTION", "CEDULA SUPERVISOR", "SUPERVISOR", "CEDULA LIDER ", "LIDER DE GESTION", "CEDULA PROFESIONAL", "PROFESIONAL"}),
-        Replaced_Null_Name_Liteyca = Table.ReplaceValue(Replaced_To_Null_5,null,"Liteyca",Replacer.ReplaceValue,{"NOMBRE TECNICO", "AUXILIAR DE GESTION", "SUPERVISOR", "LIDER DE GESTION", "PROFESIONAL"}),
-        Trimmed_Text = Table.TransformColumns(Replaced_Null_Name_Liteyca,{{"EMPRESA", Text.Trim, type text}, {"DEPARTAMENTO", Text.Trim, type text}, {"AREA", Text.Trim, type text}, {"AREA DE COBERTURA", Text.Trim, type text}, {"NOMBRE TECNICO", Text.Trim, type text}, {"TIPO CUADRILLA", Text.Trim, type text}, {"NOMBRE AUXILIAR", Text.Trim, type text}, {"PROYECTO", Text.Trim, type text}, {"HABILIDAD", Text.Trim, type text}, {"AUXILIAR DE GESTION", Text.Trim, type text}, {"SUPERVISOR", Text.Trim, type text}, {"LIDER DE GESTION", Text.Trim, type text}, {"PROFESIONAL", Text.Trim, type text}}),
-        Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"EMPRESA", Text.Clean, type text}, {"DEPARTAMENTO", Text.Clean, type text}, {"AREA", Text.Clean, type text}, {"AREA DE COBERTURA", Text.Clean, type text}, {"NOMBRE TECNICO", Text.Clean, type text}, {"TIPO CUADRILLA", Text.Clean, type text}, {"NOMBRE AUXILIAR", Text.Clean, type text}, {"PROYECTO", Text.Clean, type text}, {"HABILIDAD", Text.Clean, type text}, {"AUXILIAR DE GESTION", Text.Clean, type text}, {"SUPERVISOR", Text.Clean, type text}, {"LIDER DE GESTION", Text.Clean, type text}, {"PROFESIONAL", Text.Clean, type text}}),
-        Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"EMPRESA", Text.Proper, type text}, {"DEPARTAMENTO", Text.Proper, type text}, {"AREA", Text.Proper, type text}, {"AREA DE COBERTURA", Text.Proper, type text}, {"NOMBRE TECNICO", Text.Proper, type text}, {"TIPO CUADRILLA", Text.Proper, type text}, {"NOMBRE AUXILIAR", Text.Proper, type text}, {"PROYECTO", Text.Proper, type text}, {"HABILIDAD", Text.Proper, type text}, {"AUXILIAR DE GESTION", Text.Proper, type text}, {"SUPERVISOR", Text.Proper, type text}, {"LIDER DE GESTION", Text.Proper, type text}, {"PROFESIONAL", Text.Proper, type text}}),
-        Renamed_Columns = Table.RenameColumns(Capitalized_Each_Word,{{"EMPRESA", "Contrata"}, {"DEPARTAMENTO", "Dep Cuadri"}, {"AREA", "AreaCuadri"}, {"CEDULA TECNICO", "CC Tec"}, {"NOMBRE TECNICO", "Nom Tec"}, {"AREA DE COBERTURA", "Cobertura"}, {"TIPO CUADRILLA", "Tipo Cuadrilla"}, {"ID RECURSO TOA", "Id TOA"}, {"CEDULA AUXILIAR", "CC Aux"}, {"NOMBRE AUXILIAR", "Nom Aux"}, {"PROYECTO", "Proyecto"}, {"HABILIDAD", "Habilidad"}, {"CEDULA AUX GESTION", "CC Gestor"}, {"AUXILIAR DE GESTION", "Nom Gestor"}, {"CEDULA SUPERVISOR", "CC Super"}, {"SUPERVISOR", "Nom Super"}, {"CEDULA LIDER ", "CC Lider"}, {"LIDER DE GESTION", "Nom Lider"}, {"CEDULA PROFESIONAL", "CC Profesional"}, {"PROFESIONAL", "Nom Profesional"}}),
-        Filtered_Null_CC_Tec = Table.SelectRows(Renamed_Columns, each [CC Tec] <> null and [CC Tec] <> ""),
-        Merged_Tbl_Departamentos = Table.NestedJoin(Filtered_Null_CC_Tec, {"Dep Cuadri"}, Tbl_Departamentos, {"Departamento"}, "TblDepartamentos", JoinKind.RightOuter),
-        Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Departamentos, each [Dep Cuadri] <> null and [Dep Cuadri] <> ""),
-        Removed_Columns = Table.RemoveColumns(Filtered_Null_Dep,{"TblDepartamentos"}),
-        Removed_Duplicates = Table.Distinct(Removed_Columns)
-    in
-        Removed_Duplicates,
-
-    Personal_Sin_Cuadrillas = let
-        My_Conformacion_Cuadrillas = Table.SelectColumns(Consolidado_Cuadrillas,{"Contrata", "Dep Cuadri", "AreaCuadri", "CC Tec", "Nom Tec", "Tipo Cuadrilla", "CC Gestor", "Nom Gestor", "CC Super", "Nom Super", "Fecha Inicial", "Fecha Final", "Nom Aux", "CC Aux"}),
-        Cuadrillas_Completas = fxMiCalendarioDia(My_Conformacion_Cuadrillas, "Fecha Inicial", "Fecha Final"),
-        Consolidado_Produccion = Table.Combine({Produccion_Altas, Produccion_Mantenimiento}),
-        Removed_Other_Columns = Table.SelectColumns(Consolidado_Produccion,{"Departamento", "CC Tec", "Fecha", "Baremos", "AreaCuadri", "Actividades"}),
-        Replaced_Null_Bar_Act = Table.ReplaceValue(Removed_Other_Columns,null,0,Replacer.ReplaceValue,{"Baremos", "Actividades"}),
-        Grouped_Rows_Produccion = Table.Group(Replaced_Null_Bar_Act, {"Departamento", "CC Tec", "Fecha"}, {{"Bar", each List.Sum([Baremos]), type nullable number}, {"Act", each List.Sum([Actividades]), type nullable number}}),
-        Added_AreaCuadri = Table.AddColumn(Grouped_Rows_Produccion, "AreaCuadri", each if [Bar] >= [Act] then "INSTALACIONES" else "MANTENIMIENTO", type text),
-        Merged_Cuadrillas = Table.NestedJoin(Added_AreaCuadri, {"Departamento", "CC Tec", "Fecha"}, Cuadrillas_Completas, {"Dep Cuadri", "CC Tec", "Fecha"}, "ConsolidadoCuadrillas", JoinKind.LeftAnti),
-        Expanded_Cuadrillas = Table.ExpandTableColumn(Merged_Cuadrillas, "ConsolidadoCuadrillas", {"Contrata", "Nom Tec", "Tipo Cuadrilla", "CC Gestor", "Nom Gestor", "CC Super", "Nom Super", "Nom Aux", "CC Aux"}, {"Contrata", "Nom Tec", "Tipo Cuadrilla", "CC Gestor", "Nom Gestor", "CC Super", "Nom Super", "Nom Aux", "CC Aux"}),
-        Replaced_Null_1 = Table.ReplaceValue(Expanded_Cuadrillas,null,"Liteyca",Replacer.ReplaceValue,{"Contrata", "Nom Tec", "Nom Gestor", "Nom Super", "Nom Aux"}),
-        Replaced_Null_Tipo_Cuadrilla = Table.ReplaceValue(Replaced_Null_1,null,"M1",Replacer.ReplaceValue,{"Tipo Cuadrilla"}),
-        Grouped_Rows = Table.Group(Replaced_Null_Tipo_Cuadrilla, {"Departamento", "CC Tec"}, {{"Fecha Inicial", each List.Min([Fecha]), type nullable date}, {"Fecha Final", each List.Max([Fecha]), type nullable date}, {"All", each _, type table [Departamento=text, CC Tec=nullable text, Fecha=nullable date, Bar=nullable number, Act=nullable number, AreaCuadri=text, Contrata=nullable text, Nom Tec=nullable text, Tipo Cuadrilla=nullable text, CC Gestor=nullable text, Nom Gestor=nullable text, CC Super=nullable text, Nom Super=nullable text, Nom Aux=nullable text, CC Aux=nullable text]}}),
-        Expanded_All = Table.ExpandTableColumn(Grouped_Rows, "All", {"AreaCuadri", "Contrata", "Nom Tec", "Tipo Cuadrilla", "CC Gestor", "Nom Gestor", "CC Super", "Nom Super", "Nom Aux", "CC Aux"}, {"AreaCuadri", "Contrata", "Nom Tec", "Tipo Cuadrilla", "CC Gestor", "Nom Gestor", "CC Super", "Nom Super", "Nom Aux", "CC Aux"}),
-        Renamed_Dep = Table.RenameColumns(Expanded_All,{{"Departamento", "Dep Cuadri"}}),
-        Removed_Duplicates = Table.Distinct(Renamed_Dep)
-    in
-        Removed_Duplicates,
-
-    Cuadrillas_Sin_Produccion = let
-        My_Produccion = Table.Combine({Produccion_Altas, Produccion_Mantenimiento}),
-        Source = let
-            Source = Consolidado_Cuadrillas,
-            Removed_Other_Columns = Table.SelectColumns(Source,{"Contrata", "Dep Cuadri", "AreaCuadri", "CC Tec", "Nom Tec", "Tipo Cuadrilla", "CC Gestor", "Nom Gestor", "CC Super", "Nom Super", "Fecha Inicial", "Fecha Final", "Nom Aux", "CC Aux"}),
-            Appended_Query = Table.Combine({Removed_Other_Columns, Personal_Sin_Cuadrillas}),
-            fxMyCalendario = fxMiCalendarioDia(Appended_Query, "Fecha Inicial", "Fecha Final"),
-            Removed_Duplicates = Table.Distinct(fxMyCalendario)
-        in
-            Removed_Duplicates,
-        Selected_Columns = Table.SelectColumns(Source,{"Dep Cuadri", "CC Tec", "Fecha"}),
-        Merged_Produccion = Table.NestedJoin(Selected_Columns, {"Dep Cuadri", "CC Tec", "Fecha"}, My_Produccion, {"Departamento", "CC Tec", "Fecha"}, "Produccion", JoinKind.LeftAnti),
-        Expanded_Produccion = Table.ExpandTableColumn(Merged_Produccion, "Produccion", {"Atiempo", "Atis", "Tipo Orden", "Tipo Tarea", "Medio de Acceso", "Baremos", "AreaCuadri", "Actividades"}, {"Atiempo", "Atis", "Tipo Orden", "Tipo Tarea", "Medio de Acceso", "Baremos", "AreaCuadri", "Actividades"}),
-        Filtered_Null_Dep = Table.SelectRows(Expanded_Produccion, each [Dep Cuadri] <> null and [Dep Cuadri] <> ""),
-        Renamed_Departamento = Table.RenameColumns(Filtered_Null_Dep,{{"Dep Cuadri", "Departamento"}}),
-        Replaced_Null_Bar_Act = Table.ReplaceValue(Renamed_Departamento,null,0,Replacer.ReplaceValue,{"Baremos", "Actividades"}),
-        Added_Recuento = Table.AddColumn(Replaced_Null_Bar_Act, "Recuento", each 1, Int64.Type),
-        Added_Dia_Trabajado = Table.AddColumn(Added_Recuento, "DiaTrabajado", each 1, type number),
-        Removed_Duplicates = Table.Distinct(Added_Dia_Trabajado)
-    in
-        Removed_Duplicates,
-
-    Rangos_Tesa = let
-        Source = Produccion,
-        Removed_Columns = Table.RemoveColumns(Source,{"AreaCuadri"}),
-        Inserted_Year = Table.AddColumn(Removed_Columns, "Año", each Date.Year([Fecha]), Int64.Type),
-        Inserted_Month = Table.AddColumn(Inserted_Year, "Mes", each Date.Month([Fecha]), Int64.Type),
-        Merged_Cuadrillas = Table.NestedJoin(Inserted_Month, {"CC Tec", "Fecha"}, Cuadrillas, {"CC Tec", "Fecha"}, "Cuadrillas", JoinKind.LeftOuter),
-        Expanded_Cuadrillas = Table.ExpandTableColumn(Merged_Cuadrillas, "Cuadrillas", {"AreaCuadri", "Contrata", "Dep Cuadri", "Nom Gestor", "Nom Super"}, {"AreaCuadri", "Contrata", "Dep Cuadri", "Nom Gestor", "Nom Super"}),
-        Replaced_Null_Columns = Table.ReplaceValue(Expanded_Cuadrillas,null,"Liteyca",Replacer.ReplaceValue,{"Nom Gestor", "Nom Super", "AreaCuadri", "Contrata"}),
-        Replaced_Null_Dep_Cuadri_to_Departamento = Table.ReplaceValue(Replaced_Null_Columns,null, each [Departamento],Replacer.ReplaceValue,{"Dep Cuadri"}),
-        Added_Area = Table.AddColumn(Replaced_Null_Dep_Cuadri_to_Departamento, "Area", each if [Tipo Orden] = "AVERIA" then "Mantenimiento" else "Instalaciones", type text),
-        Select_Columns = Table.SelectColumns(Added_Area,{"Departamento", "CC Tec", "Fecha", "Año", "Mes", "AreaCuadri", "Contrata", "Dep Cuadri", "Nom Gestor", "Nom Super", "Area"}),
-        Removed_Duplicates = Table.Distinct(Select_Columns),
-        Grouped_Rows_Dias_Tabajo = Table.Group(Removed_Duplicates, {"Departamento", "Area", "CC Tec", "Año", "Mes", "Nom Gestor", "Nom Super", "AreaCuadri", "Dep Cuadri", "Contrata"}, {{"Dias Trabajado", each Table.RowCount(_), Int64.Type}}),
-        Added_Puntos_Base_Added_Area = Table.AddColumn(Added_Area, "Puntos", each if [Area] = "Instalaciones" then [Baremos] else [Actividades]* 1.3, type number),
-        Grouped_Rows_Puntos = Table.Group(Added_Puntos_Base_Added_Area, {"Departamento", "Area", "CC Tec", "Año", "Mes", "Nom Gestor", "Nom Super", "AreaCuadri", "Dep Cuadri", "Contrata"}, {{"Puntos", each List.Sum([Puntos]), type number}}),
-        Merged_Group_Dias_Tabajo = Table.NestedJoin(Grouped_Rows_Puntos, {"Departamento", "Area", "CC Tec", "Año", "Mes", "Nom Gestor", "Nom Super", "AreaCuadri", "Dep Cuadri", "Contrata"}, Grouped_Rows_Dias_Tabajo, {"Departamento", "Area", "CC Tec", "Año", "Mes", "Nom Gestor", "Nom Super", "AreaCuadri", "Dep Cuadri", "Contrata"}, "RangosTesa", JoinKind.LeftOuter),
-        Expanded_Dias_Trabajo = Table.ExpandTableColumn(Merged_Group_Dias_Tabajo, "RangosTesa", {"Dias Trabajado"}, {"Dias Trabajado"}),
-        Added_Diario_Puntos = Table.AddColumn(Expanded_Dias_Trabajo, "Diario Puntos", each [Puntos]/[Dias Trabajado], type number),
-        Added_Clasificacion = Table.AddColumn(Added_Diario_Puntos, "Clasificacion", each if [Diario Puntos] >= 8 then "Alto" else if [Diario Puntos] <= 6.0 then "Bajo" else "Medio", type text),
-        Added_Clasificacion_Insta = Table.AddColumn(Added_Clasificacion, "ClasificacionInsta", each if [Diario Puntos] >= 9.5 then "Alto" else if [Diario Puntos] <= 6 then "Bajo" else "Medio", type text),
-        Added_Orden = Table.AddColumn(Added_Clasificacion_Insta, "Orden", each if [Clasificacion] = "Bajo" then 1 else if [Clasificacion] = "Medio" then 2 else if [Clasificacion] = "Alto" then 3 else 4, type number),
-        Added_Mes_Año = Table.AddColumn(Added_Orden, "Mes Año", each Text.From([Año]) & " " & Text.From([Mes]), type text),
-        Merged_Acceso_Cuadrillas = Table.NestedJoin(Added_Mes_Año, {"CC Tec", "Año", "Mes"}, AccesosCuadrillas_2, {"CCTec", "Año", "Mes"}, "AccesosCuadrillas", JoinKind.LeftOuter),
-        Expanded_Acceso_Cuadrillas = Table.ExpandTableColumn(Merged_Acceso_Cuadrillas, "AccesosCuadrillas", {"Acceso", "Cargo"}, {"Acceso", "Cargo"}),
-        Replaced_Null_Acceso = Table.ReplaceValue(Expanded_Acceso_Cuadrillas,null,"9999999999",Replacer.ReplaceValue,{"Acceso"}),
-        Replaced_Null_Cargo = Table.ReplaceValue(Replaced_Null_Acceso,null,"Admin",Replacer.ReplaceValue,{"Cargo"}),
-        Removed_Duplicates_Final = Table.Distinct(Replaced_Null_Cargo)
-    in
-        Removed_Duplicates_Final,
-
-    Cuadrillas = let
-        Source = Consolidado_Cuadrillas,
-        Removed_Other_Columns = Table.SelectColumns(Source,{"Contrata", "Dep Cuadri", "AreaCuadri", "CC Tec", "Nom Tec", "Tipo Cuadrilla", "CC Gestor", "Nom Gestor", "CC Super", "Nom Super", "Fecha Inicial", "Fecha Final", "Nom Aux", "CC Aux"}),
-        Appended_Personal_Sin_Cuadrillas = Table.Combine({Removed_Other_Columns, Personal_Sin_Cuadrillas}),
-        fxMyCalendario = fxMiCalendarioFinal(Appended_Personal_Sin_Cuadrillas, "Fecha Inicial", "Fecha Final"),
-        Added_Tipo_Empresa = Table.AddColumn(fxMyCalendario, "Tipo Empresa", each if [Contrata] = "Liteyca" then "Propio" else "Contratista", type text),
-        Merged_Acceso_Cuadrillas = Table.NestedJoin(Added_Tipo_Empresa, {"CC Tec", "Dep Cuadri", "Fecha"}, AccesosCuadrillas_2, {"CCTec", "Departamento", "Fecha"}, "AccesosCuadrillas_2", JoinKind.LeftOuter),
-        Expanded_Acceso_Cuadrillas = Table.ExpandTableColumn(Merged_Acceso_Cuadrillas, "AccesosCuadrillas_2", {"Acceso", "Cargo", "ApuCuadrilla"}, {"Acceso", "Cargo", "ApuCuadrilla"}),
-        Replaced_Cargo = Table.ReplaceValue(Expanded_Acceso_Cuadrillas,null,"Admin",Replacer.ReplaceValue,{"Cargo"}),
-        Replaced_Acceso = Table.ReplaceValue(Replaced_Cargo,null,"9999999999",Replacer.ReplaceValue,{"Acceso"}),
-        Replaced_Apu_Cuadrilla = Table.ReplaceValue(Replaced_Acceso,null,0,Replacer.ReplaceValue,{"ApuCuadrilla"}),
-        Merged_Tbl_Bonos = Table.NestedJoin(Replaced_Apu_Cuadrilla, {"Cargo", "AreaCuadri", "Tipo Cuadrilla", "Año", "Mes"}, Tbl_Bonos, {"Cargo", "CuadrillaArea", "TipoCuadrilla", "Año", "Mes"}, "TblBonos", JoinKind.LeftOuter),
-        Expanded_Tbl_Bonos = Table.ExpandTableColumn(Merged_Tbl_Bonos, "TblBonos", {"BonoCuadrilla", "IncrementoBono", "MetaMes", "Salario", "Max Porc Bono", "Parte Presta", "Parte Cuadri 2 Per", "Aux.Salario", "Aux.Max Porc Bono", "Aux.Parte Presta", "Aux.Parte Cuadri 2 Per"}, {"BonoCuadrilla", "IncrementoBono", "MetaMes", "Salario", "Max Porc Bono", "Parte Presta", "Parte Cuadri 2 Per", "Aux.Salario", "Aux.Max Porc Bono", "Aux.Parte Presta", "Aux.Parte Cuadri 2 Per"}),
-        Merged_Meta_Mostrar = Table.NestedJoin(Expanded_Tbl_Bonos, {"Dep Cuadri", "AreaCuadri", "Tipo Cuadrilla", "Año", "Mes"}, Tbl_Meta_Mostrar, {"Departamento", "CuadrillaArea", "Tipo", "Año", "Mes"}, "TblMetaMostrar", JoinKind.LeftOuter),
-        Expanded_Meta_Mostrar = Table.ExpandTableColumn(Merged_Meta_Mostrar, "TblMetaMostrar", {"MetaMostrar"}, {"Pre.MetaMostrar"}),
-        Filtered_Null_Fecha = Table.SelectRows(Expanded_Meta_Mostrar , each [Fecha] <> null and [Fecha] <> "")
-    in
-        Filtered_Null_Fecha,
-
-    AccesosCuadrillas_2 = let
-        Source = Tablas_Base,
-        #"Filtered Rows" = Source{[Item="AccesosCuadrillas_2"]}[Data],
-        Trimmed_Text = Table.TransformColumns(#"Filtered Rows",{{"Area Cuadri", Text.Trim, type text}, {"Nom Super", Text.Trim, type text}, {"Nom Gestor", Text.Trim, type text}, {"Nom Tec", Text.Trim, type text}, {"Contrata", Text.Trim, type text}, {"Departamento", Text.Trim, type text}, {"Cargo", Text.Trim, type text}}),
-        Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Area Cuadri", Text.Clean, type text}, {"Nom Super", Text.Clean, type text}, {"Nom Gestor", Text.Clean, type text}, {"Nom Tec", Text.Clean, type text}, {"Contrata", Text.Clean, type text}, {"Departamento", Text.Clean, type text}, {"Cargo", Text.Clean, type text}}),
-        Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"Area Cuadri", Text.Proper, type text}, {"Nom Super", Text.Proper, type text}, {"Nom Gestor", Text.Proper, type text}, {"Nom Tec", Text.Proper, type text}, {"Contrata", Text.Proper, type text}, {"Departamento", Text.Proper, type text}, {"Cargo", Text.Proper, type text}}),
-        Invoke_fxCalendario_Dia = fxMiCalendarioDia(Capitalized_Each_Word, "FechaMin", "FechaMax"),
-        Merged_Mes_Act = Table.NestedJoin(Invoke_fxCalendario_Dia, {"Mes", "Año"}, Mes_Actualizar, {"Mes", "Año"}, "Mes_Actualizar", JoinKind.RightOuter),
-        Filtered_Null_Departamento = Table.SelectRows(Merged_Mes_Act, each [Departamento] <> null and [Departamento] <> ""),
-        Removed_Column_Mes_Act = Table.RemoveColumns(Filtered_Null_Departamento,{"Mes_Actualizar"})
-    in
-        Removed_Column_Mes_Act,
-
-    Tbl_Bonos = let
-        Source = Tablas_Base,
-        #"Filtered Rows" = Source{[Item="TblBonos"]}[Data],
-        Trimmed_Text = Table.TransformColumns(#"Filtered Rows",{{"Cargo", Text.Trim, type text}, {"CuadrillaArea", Text.Trim, type text}, {"TipoCuadrilla", Text.Trim, type text}}),
-        Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Cargo", Text.Clean, type text}, {"CuadrillaArea", Text.Clean, type text}, {"TipoCuadrilla", Text.Clean, type text}}),
-        Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"Cargo", Text.Proper, type text}, {"CuadrillaArea", Text.Proper, type text}, {"TipoCuadrilla", Text.Proper, type text}}),
-        Invoke_fxCalendario_Mes = fxMiCalendarioMes(Capitalized_Each_Word, "FechaInicio", "FechaFin"),
-        Merged_Mes_Act = Table.NestedJoin(Invoke_fxCalendario_Mes, {"Mes", "Año"}, Mes_Actualizar, {"Mes", "Año"}, "Mes_Actualizar", JoinKind.RightOuter),
-        Filtered_Null_Cargo = Table.SelectRows(Merged_Mes_Act, each [Cargo] <> null and [Cargo] <> ""),
-        Removed_Column_Mes_Act = Table.RemoveColumns(Filtered_Null_Cargo,{"Mes_Actualizar"}),
-        Added_Cargo_2 = Table.AddColumn(Removed_Column_Mes_Act, "Personalizado", each if [Cargo] = "Admin" then "Aux Tec" else if [Cargo] = "TECNICO" then "Aux Tec" else null, type text),
-        Merged_Tbl_Bonos = Table.NestedJoin(Added_Cargo_2, {"Personalizado", "CuadrillaArea", "TipoCuadrilla", "Año", "Mes"}, Added_Cargo_2, {"Cargo", "CuadrillaArea", "TipoCuadrilla", "Año", "Mes"}, "Added Conditional Column", JoinKind.LeftOuter),
-        Expanded_Tbl_Bonos = Table.ExpandTableColumn(Merged_Tbl_Bonos, "Added Conditional Column", {"Salario", "Max Porc Bono", "Parte Presta", "Parte Cuadri 2 Per"}, {"Aux.Salario", "Aux.Max Porc Bono", "Aux.Parte Presta", "Aux.Parte Cuadri 2 Per"})
-    in
-        Expanded_Tbl_Bonos,
-
-    Tbl_Meta_Mostrar = let
-        Source = Tablas_Base,
-        #"Filtered Rows" = Source{[Item="TblMetaMostrar"]}[Data],
-        Trimmed_Text = Table.TransformColumns(#"Filtered Rows",{{"Departamento", Text.Trim, type text}, {"CuadrillaArea", Text.Trim, type text}, {"Tipo", Text.Trim, type text}}),
-        Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Departamento", Text.Clean, type text}, {"CuadrillaArea", Text.Clean, type text}, {"Tipo", Text.Clean, type text}}),
-        Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"Departamento", Text.Proper, type text}, {"CuadrillaArea", Text.Proper, type text}, {"Tipo", Text.Proper, type text}}),
-        Invoke_fxCalendario_Mes = fxMiCalendarioMes(Capitalized_Each_Word, "FechaInicio", "FechaFin"),
-        Merged_Mes_Act = Table.NestedJoin(Invoke_fxCalendario_Mes, {"Mes", "Año"}, Mes_Actualizar, {"Mes", "Año"}, "Mes_Actualizar", JoinKind.RightOuter),
-        Filtered_Null_Departamento = Table.SelectRows(Merged_Mes_Act, each [Departamento] <> null and [Departamento] <> ""),
-        Removed_Column_Mes_Act = Table.RemoveColumns(Filtered_Null_Departamento,{"Mes_Actualizar"})
-    in
-        Removed_Column_Mes_Act
+    Source = Folder.Files("C:\Users\MacLiteyca\OneDrive - liteyca.es\ProduccionTecnicos")
 in
-    Rangos_Tesa
+    Source
+
+// Cumplimiento_Citas
+let
+    Source = ProduccionTecnicos,
+    Filtered_Extension = Table.SelectRows(Source, each ([Extension] = ".txt")),
+    Filtered_Folder_Path = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\CalculoBonificacion\Cumplimiento de Citas\")),
+    Added_Year = Table.AddColumn(Filtered_Folder_Path, "Año", each Text.BetweenDelimiters([Name], "_", ".", 1, 0), type text),
+    Added_Mes = Table.AddColumn(Added_Year, "Mes", each Text.BetweenDelimiters([Name], "_", "_"), type text),
+    Changed_Type_Date = Table.TransformColumnTypes(Added_Mes,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
+    Filtered_Null_Name = Table.SelectRows(Changed_Type_Date, each [Name] <> null and [Name] <> ""),
+    Transform_Content = Table.TransformColumns(Filtered_Null_Name, {"Content", each Table.PromoteHeaders(Csv.Document(_,[Delimiter="Õ", Columns=33, Encoding=1252, QuoteStyle=QuoteStyle.None]), [PromoteAllScalars=true])}),
+    Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"Numero_de_orden_del_agendador", "SLA", "exclusiones_contrato", "Fecha_cita_agendamiento", "eta", "AÑO_CIERRE", "MES_CIERRE", "DIA_CIERRE", "Tipo_de_orden", "Subtipo_de_orden", "Pet_atis", "Identificador_PC_Linea", "Identificador_PC_TV", "Segmento", "Descripcion_de_Segmento", "Subsegmento", "Descripcion_de_Subsegmento", "Familia", "Fecha_Registro_en_Front", "Segmento_homologado", "Ciudad", "Departamento", "Barrio", "Zona_de_trabajo_TOA", "Numero_de_actuacion", "Fecha_de_registro", "XA_ACTUACION", "XA_ORDER_ATIS", "XA_WORK_TYPE", "XA_CREATION_DATE", "contratista", "provider_source", "external_id"}, {"Numero_de_orden_del_agendador", "SLA", "exclusiones_contrato", "Fecha_cita_agendamiento", "eta", "AÑO_CIERRE", "MES_CIERRE", "DIA_CIERRE", "Tipo_de_orden", "Subtipo_de_orden", "Pet_atis", "Identificador_PC_Linea", "Identificador_PC_TV", "Segmento", "Descripcion_de_Segmento", "Subsegmento", "Descripcion_de_Subsegmento", "Familia", "Fecha_Registro_en_Front", "Segmento_homologado", "Ciudad", "Departamento", "Barrio", "Zona_de_trabajo_TOA", "Numero_de_actuacion", "Fecha_de_registro", "XA_ACTUACION", "XA_ORDER_ATIS", "XA_WORK_TYPE", "XA_CREATION_DATE", "contratista", "provider_source", "external_id"}),
+    Filtered_Separador = Table.SelectRows(Expanded_Content, each not Text.Contains([Numero_de_orden_del_agendador], "-")),
+    Filtered_Null_Column2 = Table.SelectRows(Filtered_Separador, each [SLA] <> null and [SLA] <> ""),
+    Filtered_Null_Fecha = Table.SelectRows(Filtered_Null_Column2, each [Fecha_cita_agendamiento] <> null and [Fecha_cita_agendamiento] <> ""),
+    Transform_Fecha = Table.TransformColumns(Filtered_Null_Fecha,{{"Fecha_cita_agendamiento", each Date.From(Value.FromText(_)), type date}}),
+    Filtered_Exclusiones_Contrato = Table.SelectRows(Transform_Fecha, each [exclusiones_contrato] = "NULL"),
+    Removed_Other_Columns = Table.SelectColumns(Filtered_Exclusiones_Contrato,{"SLA", "Fecha_cita_agendamiento", "AÑO_CIERRE", "MES_CIERRE", "Pet_atis", "Departamento", "Numero_de_actuacion", "external_id"}),
+    Replaced_NULL_null = Table.ReplaceValue(Removed_Other_Columns,"NULL",null,Replacer.ReplaceValue,{"SLA", "Pet_atis", "Departamento", "Numero_de_actuacion", "external_id"}),
+    Changed_Type = Table.TransformColumnTypes(Replaced_NULL_null,{{"SLA", type text}, {"Fecha_cita_agendamiento", type date}, {"Pet_atis", type text}, {"Departamento", type text}, {"Numero_de_actuacion", type text}, {"external_id", type text}, {"AÑO_CIERRE", Int64.Type}, {"MES_CIERRE", Int64.Type}}),
+    Trimmed_Text = Table.TransformColumns(Changed_Type,{{"SLA", Text.Trim, type text}, {"Pet_atis", Text.Trim, type text}, {"Departamento", Text.Trim, type text}, {"Numero_de_actuacion", Text.Trim, type text}, {"external_id", Text.Trim, type text}}),
+    Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"SLA", Text.Clean, type text}, {"Pet_atis", Text.Clean, type text}, {"Departamento", Text.Clean, type text}, {"Numero_de_actuacion", Text.Clean, type text}, {"external_id", Text.Clean, type text}}),
+    Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"SLA", Text.Proper, type text}, {"Departamento", Text.Proper, type text}}),
+    Renamed_Columns = Table.RenameColumns(Capitalized_Each_Word,{{"Fecha_cita_agendamiento", "Fecha"}, {"Pet_atis", "Atis"}, {"Numero_de_actuacion", "ATiempo"}, {"AÑO_CIERRE", "Año"}, {"MES_CIERRE", "Mes"}}),
+    Filtered_Null_Atis = Table.SelectRows(Renamed_Columns, each [Atis] <> null and [Atis] <> ""),
+    Filtered_Null_CC_Tec = Table.SelectRows(Filtered_Null_Atis, each [external_id] <> null and [external_id] <> ""),
+    Merged_Tbl_Departamentos = Table.NestedJoin(Filtered_Null_CC_Tec, {"Departamento"}, Tbl_Departamentos, {"Departamento"}, "TblDepartamentos", JoinKind.RightOuter),
+    Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Departamentos, each [Departamento] <> null and [Departamento] <> ""),
+    Removed_Columns = Table.RemoveColumns(Filtered_Null_Dep,{"TblDepartamentos"}),
+    Added_Cantidad = Table.AddColumn(Removed_Columns, "Cantidad", each 1, type number),
+    Pivoted_SLA = Table.Pivot(Added_Cantidad, List.Distinct(Added_Cantidad[SLA]), "SLA", "Cantidad", List.Sum),
+    Replaced_Null__No_Cumple = try(Table.ReplaceValue(Pivoted_SLA,null,0,Replacer.ReplaceValue,{"No Cumple"})) otherwise(Table.AddColumn(Pivoted_SLA, "No Cumple", each 0, type number)),
+    Replaced_Null__Cumple = try(Table.ReplaceValue(Replaced_Null__No_Cumple,null,0,Replacer.ReplaceValue,{"Cumple"})) otherwise(Table.AddColumn(Replaced_Null__No_Cumple, "Cumple", each 0, type number)),
+    Added_Aperturas = Table.AddColumn(Replaced_Null__Cumple, "Aperturas", each "Cumplimiento de citas", type text),
+    Added_Productos = Table.AddColumn(Added_Aperturas, "Productos", each "TOTAL", type text),
+    Removed_Duplicates = Table.Distinct(Added_Productos)
+in
+    Removed_Duplicates
+
+// fxMiCalendarioMes
+let 
+    fxMiCalendarioMes = (TablaReferencia as table, NombreColumnaInicial as text, NombreColumnaFinal as text) => let
+        Source = try(Table.RemoveColumns(TablaReferencia,{"Año", "Mes"}))otherwise(TablaReferencia),
+        FechaMenor = NombreColumnaInicial,
+        FechaMayor= NombreColumnaFinal,
+        Duplicated_Inicial = Table.DuplicateColumn(Source, FechaMenor, "Fecha_Minima_Duplicada"),
+        FechaInicial = List.Min(Duplicated_Inicial[Fecha_Minima_Duplicada]),
+        Duplicated_Final = Table.DuplicateColumn(Duplicated_Inicial, FechaMayor, "Fecha_Maxima_Duplicada"),
+        FechaFinal = List.Max(Duplicated_Final[Fecha_Maxima_Duplicada]),
+        Added_Fecha = Table.AddColumn(Duplicated_Final, "Fecha", each if([Fecha_Minima_Duplicada]<[Fecha_Maxima_Duplicada])then({Number.From([Fecha_Minima_Duplicada])..Number.From([Fecha_Maxima_Duplicada])})else({Number.From([Fecha_Maxima_Duplicada])..Number.From([Fecha_Minima_Duplicada])})),
+        Expanded_Fecha = Table.ExpandListColumn(Added_Fecha, "Fecha"),
+        Changed_Type_Fecha = Table.TransformColumnTypes(Expanded_Fecha,{{"Fecha", type date}}),
+        Inserted_Year = Table.AddColumn(Changed_Type_Fecha, "Año", each Date.Year([Fecha]), Int64.Type),
+        Inserted_Month = Table.AddColumn(Inserted_Year, "Mes", each Date.Month([Fecha]), Int64.Type),
+        Removed_Columns_Fechas = Table.RemoveColumns(Inserted_Month,{FechaMenor, FechaMayor, "Fecha_Minima_Duplicada", "Fecha_Maxima_Duplicada", "Fecha"}),
+        Removed_Duplicates = Table.Distinct(Removed_Columns_Fechas)
+    in
+        Removed_Duplicates
+in
+    fxMiCalendarioMes
+
+// Tablas_Base
+let
+    Source = ProduccionTecnicos,
+    Filtered_Extension = Table.SelectRows(Source, each [Extension] = ".xlsx"),
+    Filtered_Folder = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\VersionesBI\V12 Mac\")),
+    Filtered_Name = Table.SelectRows(Filtered_Folder, each Text.StartsWith([Name], "Tablas Base")),
+    Removed_Other_Columns = Table.SelectColumns(Filtered_Name,{"Content"}),
+    Transform_Content = Table.TransformColumns(Removed_Other_Columns, {"Content", each Excel.Workbook(_)}),
+    Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"Name", "Data", "Item", "Kind", "Hidden"}, {"Name", "Data", "Item", "Kind", "Hidden"}),
+    Filtered_Kind_Table = Table.SelectRows(Expanded_Content, each [Kind] = "Table")
+in
+    Filtered_Kind_Table
+
+// Tbl_Departamentos
+let
+    Source = Tablas_Base,
+    Filtered_Rows = Source{[Item="TblDepartamentos"]}[Data],
+    Trimmed_Departamento = Table.TransformColumns(Filtered_Rows,{{"Departamento", Text.Trim, type text}}),
+    Cleaned_Departamento = Table.TransformColumns(Trimmed_Departamento,{{"Departamento", Text.Clean, type text}}),
+    Capitalized_Departamento = Table.TransformColumns(Cleaned_Departamento,{{"Departamento", Text.Proper, type text}}),
+    Invoke_fxCalendario_Mes = fxMiCalendarioMes(Capitalized_Departamento, "FechaInicio", "FechaFin"),
+    Filtered_Null_Departamento = Table.SelectRows(Invoke_fxCalendario_Mes, each [Departamento] <> null and [Departamento] <> "")
+in
+    Filtered_Null_Departamento
+
+// Plazo_3_Dias
+let
+    Source = ProduccionTecnicos,
+    Filtered_Extension = Table.SelectRows(Source, each ([Extension] = ".txt")),
+    Filtered_Folder_Path = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\CalculoBonificacion\Plazos\")),
+    Added_Year = Table.AddColumn(Filtered_Folder_Path, "Año", each Text.BetweenDelimiters([Name], "_", ".", 1, 0), type text),
+    Added_Mes = Table.AddColumn(Added_Year, "Mes", each Text.BetweenDelimiters([Name], "_", "_"), type text),
+    Changed_Type_Date = Table.TransformColumnTypes(Added_Mes,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
+    Filtered_Null_Name = Table.SelectRows(Changed_Type_Date, each [Name] <> null and [Name] <> ""),
+    Transform_Content = Table.TransformColumns(Filtered_Null_Name, {"Content", each Table.PromoteHeaders(Csv.Document(_,[Delimiter="Õ", Columns=45, Encoding=1252, QuoteStyle=QuoteStyle.None]), [PromoteAllScalars=true])}),
+    Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"Numero_de_orden_del_agendador", "DIAS_CIERRE", "CUMPLE_SLA", "EXCLUSION", "DAR_POR_CUMPLIDO", "CUMPLE_SLA_3D", "EXCLUSION_3D", "DAR_POR_CUMPLIDO_3D", "ALTO_VALOR", "Medio_de_Acceso", "DEPARTAMENTO", "contratista", "Ciudad", "Tipo_de_orden", "Subtipo_de_orden", "Pet_atis", "Identificador_PC_Linea", "Identificador_PC_TV", "Nombre_de_Cliente", "No_identificacion_cliente", "Tipo_Documento_Cliente", "Segmento", "Descripcion_de_Segmento", "Subsegmento", "Descripcion_de_Subsegmento", "Familia", "Fecha_Registro_en_Front", "Segmento_homologado", "Barrio", "Zona_de_trabajo_TOA", "Numero_de_actuacion", "Fecha_de_registro", "Fecha_de_cierre_final", "AÑO_CIERRE", "MES_CIERRE", "DIA_CIERRE", "XA_ACTUACION", "XA_ORDER_ATIS", "XA_WORK_TYPE", "XA_CREATION_DATE", "provider_source", "external_id", "APERTURA_AV", "CIERRE_AV", "Fecha_cita_agendamiento"}, {"Numero_de_orden_del_agendador", "DIAS_CIERRE", "CUMPLE_SLA", "EXCLUSION", "DAR_POR_CUMPLIDO", "CUMPLE_SLA_3D", "EXCLUSION_3D", "DAR_POR_CUMPLIDO_3D", "ALTO_VALOR", "Medio_de_Acceso", "DEPARTAMENTO", "contratista", "Ciudad", "Tipo_de_orden", "Subtipo_de_orden", "Pet_atis", "Identificador_PC_Linea", "Identificador_PC_TV", "Nombre_de_Cliente", "No_identificacion_cliente", "Tipo_Documento_Cliente", "Segmento", "Descripcion_de_Segmento", "Subsegmento", "Descripcion_de_Subsegmento", "Familia", "Fecha_Registro_en_Front", "Segmento_homologado", "Barrio", "Zona_de_trabajo_TOA", "Numero_de_actuacion", "Fecha_de_registro", "Fecha_de_cierre_final", "AÑO_CIERRE", "MES_CIERRE", "DIA_CIERRE", "XA_ACTUACION", "XA_ORDER_ATIS", "XA_WORK_TYPE", "XA_CREATION_DATE", "provider_source", "external_id", "APERTURA_AV", "CIERRE_AV", "Fecha_cita_agendamiento"}),
+    Filtered_Separador = Table.SelectRows(Expanded_Content, each not Text.Contains([Numero_de_orden_del_agendador], "-")),
+    Filtered_Null_Column2 = Table.SelectRows(Filtered_Separador, each [DIAS_CIERRE] <> null and [DIAS_CIERRE] <> ""),
+    Filtered_Null_Fecha = Table.SelectRows(Filtered_Null_Column2, each [Fecha_de_cierre_final] <> null and [Fecha_de_cierre_final] <> ""),
+    Transform_Fecha = Table.TransformColumns(Filtered_Null_Fecha,{{"Fecha_de_cierre_final", each Date.From(Value.FromText(_)), type date}}),
+    Removed_Other_Columns = Table.SelectColumns(Transform_Fecha,{"CUMPLE_SLA_3D", "DEPARTAMENTO", "Pet_atis", "Identificador_PC_Linea", "Fecha_de_cierre_final", "AÑO_CIERRE", "MES_CIERRE", "external_id"}),
+    Replaced_NULL_null = Table.ReplaceValue(Removed_Other_Columns,"NULL",null,Replacer.ReplaceValue,{"CUMPLE_SLA_3D", "DEPARTAMENTO", "Pet_atis", "Identificador_PC_Linea", "external_id", "AÑO_CIERRE", "MES_CIERRE"}),
+    Changed_Type = Table.TransformColumnTypes(Replaced_NULL_null,{{"CUMPLE_SLA_3D", type text}, {"Pet_atis", type text}, {"Identificador_PC_Linea", type text}, {"Fecha_de_cierre_final", type date}, {"external_id", type text}, {"DEPARTAMENTO", type text}, {"AÑO_CIERRE", Int64.Type}, {"MES_CIERRE", Int64.Type}}),
+    Trimmed_Text = Table.TransformColumns(Changed_Type,{{"CUMPLE_SLA_3D", Text.Trim, type text}, {"Pet_atis", Text.Trim, type text}, {"Identificador_PC_Linea", Text.Trim, type text}, {"external_id", Text.Trim, type text}, {"DEPARTAMENTO", Text.Trim, type text}}),
+    Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"CUMPLE_SLA_3D", Text.Clean, type text}, {"Pet_atis", Text.Clean, type text}, {"Identificador_PC_Linea", Text.Clean, type text}, {"external_id", Text.Clean, type text}, {"DEPARTAMENTO", Text.Clean, type text}}),
+    Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"DEPARTAMENTO", Text.Proper, type text}}),
+    Renamed_Columns = Table.RenameColumns(Capitalized_Each_Word,{{"DEPARTAMENTO", "Departamento"}, {"Pet_atis", "Atis"}, {"Identificador_PC_Linea", "ATiempo"}, {"Fecha_de_cierre_final", "Fecha"}, {"AÑO_CIERRE", "Año"}, {"MES_CIERRE", "Mes"}}),
+    Filtered_Null_Atis = Table.SelectRows(Renamed_Columns, each [Atis] <> null and [Atis] <> ""),
+    Filtered_Null_CC_Tec = Table.SelectRows(Filtered_Null_Atis, each [external_id] <> null and [external_id] <> ""),
+    Merged_Tbl_Departamentos = Table.NestedJoin(Filtered_Null_CC_Tec, {"Departamento"}, Tbl_Departamentos, {"Departamento"}, "TblDepartamentos", JoinKind.RightOuter),
+    Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Departamentos, each [Departamento] <> null and [Departamento] <> ""),
+    Removed_Columns = Table.RemoveColumns(Filtered_Null_Dep,{"TblDepartamentos"}),
+    Added_Cantidad = Table.AddColumn(Removed_Columns, "Cantidad", each 1, type number),
+    Replaced_No_Cumple_SLA = Table.ReplaceValue(Added_Cantidad,"NO","No Cumple",Replacer.ReplaceText,{"CUMPLE_SLA_3D"}),
+    Replaced_Cumple_SLA = Table.ReplaceValue(Replaced_No_Cumple_SLA,"SI","Cumple",Replacer.ReplaceText,{"CUMPLE_SLA_3D"}),
+    Pivoted_SLA = Table.Pivot(Replaced_Cumple_SLA, List.Distinct(Replaced_Cumple_SLA[CUMPLE_SLA_3D]), "CUMPLE_SLA_3D", "Cantidad", List.Sum),
+    Replaced_Null__No_Cumple = try(Table.ReplaceValue(Pivoted_SLA,null,0,Replacer.ReplaceValue,{"No Cumple"})) otherwise(Table.AddColumn(Pivoted_SLA, "No Cumple", each 0, type number)),
+    Replaced_Null__Cumple = try(Table.ReplaceValue(Replaced_Null__No_Cumple,null,0,Replacer.ReplaceValue,{"Cumple"})) otherwise(Table.AddColumn(Replaced_Null__No_Cumple, "Cumple", each 0, type number)),
+    Added_Aperturas = Table.AddColumn(Replaced_Null__Cumple, "Aperturas", each "Plazos de Mtto (3 días)", type text),
+    Added_Productos = Table.AddColumn(Added_Aperturas, "Productos", each "Todos", type text),
+    Removed_Duplicates = Table.Distinct(Added_Productos)
+in
+    Removed_Duplicates
+
+// Plazos
+let
+    Source = ProduccionTecnicos,
+    Filtered_Extension = Table.SelectRows(Source, each ([Extension] = ".txt")),
+    Filtered_Folder_Path = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\CalculoBonificacion\Plazos\")),
+    Added_Year = Table.AddColumn(Filtered_Folder_Path, "Año", each Text.BetweenDelimiters([Name], "_", ".", 1, 0), type text),
+    Added_Mes = Table.AddColumn(Added_Year, "Mes", each Text.BetweenDelimiters([Name], "_", "_"), type text),
+    Changed_Type_Date = Table.TransformColumnTypes(Added_Mes,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
+    Filtered_Null_Name = Table.SelectRows(Changed_Type_Date, each [Name] <> null and [Name] <> ""),
+    Transform_Content = Table.TransformColumns(Filtered_Null_Name, {"Content", each Table.PromoteHeaders(Csv.Document(_,[Delimiter="Õ", Columns=45, Encoding=1252, QuoteStyle=QuoteStyle.None]), [PromoteAllScalars=true])}),
+    Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"Numero_de_orden_del_agendador", "DIAS_CIERRE", "CUMPLE_SLA", "EXCLUSION", "DAR_POR_CUMPLIDO", "CUMPLE_SLA_3D", "EXCLUSION_3D", "DAR_POR_CUMPLIDO_3D", "ALTO_VALOR", "Medio_de_Acceso", "DEPARTAMENTO", "contratista", "Ciudad", "Tipo_de_orden", "Subtipo_de_orden", "Pet_atis", "Identificador_PC_Linea", "Identificador_PC_TV", "Nombre_de_Cliente", "No_identificacion_cliente", "Tipo_Documento_Cliente", "Segmento", "Descripcion_de_Segmento", "Subsegmento", "Descripcion_de_Subsegmento", "Familia", "Fecha_Registro_en_Front", "Segmento_homologado", "Barrio", "Zona_de_trabajo_TOA", "Numero_de_actuacion", "Fecha_de_registro", "Fecha_de_cierre_final", "AÑO_CIERRE", "MES_CIERRE", "DIA_CIERRE", "XA_ACTUACION", "XA_ORDER_ATIS", "XA_WORK_TYPE", "XA_CREATION_DATE", "provider_source", "external_id", "APERTURA_AV", "CIERRE_AV", "Fecha_cita_agendamiento"}, {"Numero_de_orden_del_agendador", "DIAS_CIERRE", "CUMPLE_SLA", "EXCLUSION", "DAR_POR_CUMPLIDO", "CUMPLE_SLA_3D", "EXCLUSION_3D", "DAR_POR_CUMPLIDO_3D", "ALTO_VALOR", "Medio_de_Acceso", "DEPARTAMENTO", "contratista", "Ciudad", "Tipo_de_orden", "Subtipo_de_orden", "Pet_atis", "Identificador_PC_Linea", "Identificador_PC_TV", "Nombre_de_Cliente", "No_identificacion_cliente", "Tipo_Documento_Cliente", "Segmento", "Descripcion_de_Segmento", "Subsegmento", "Descripcion_de_Subsegmento", "Familia", "Fecha_Registro_en_Front", "Segmento_homologado", "Barrio", "Zona_de_trabajo_TOA", "Numero_de_actuacion", "Fecha_de_registro", "Fecha_de_cierre_final", "AÑO_CIERRE", "MES_CIERRE", "DIA_CIERRE", "XA_ACTUACION", "XA_ORDER_ATIS", "XA_WORK_TYPE", "XA_CREATION_DATE", "provider_source", "external_id", "APERTURA_AV", "CIERRE_AV", "Fecha_cita_agendamiento"}),
+    Filtered_Separador = Table.SelectRows(Expanded_Content, each not Text.Contains([Numero_de_orden_del_agendador], "-")),
+    Filtered_Null_Column2 = Table.SelectRows(Filtered_Separador, each [DIAS_CIERRE] <> null and [DIAS_CIERRE] <> ""),
+    Filtered_Null_Fecha = Table.SelectRows(Filtered_Null_Column2, each [Fecha_de_cierre_final] <> null and [Fecha_de_cierre_final] <> ""),
+    Transform_Fecha = Table.TransformColumns(Filtered_Null_Fecha,{{"Fecha_de_cierre_final", each Date.From(Value.FromText(_)), type date}}),
+    Removed_Other_Columns = Table.SelectColumns(Transform_Fecha,{"CUMPLE_SLA_3D", "DEPARTAMENTO", "Pet_atis", "Identificador_PC_Linea", "Fecha_de_cierre_final", "AÑO_CIERRE", "MES_CIERRE", "external_id"}),
+    Replaced_NULL_null = Table.ReplaceValue(Removed_Other_Columns,"NULL",null,Replacer.ReplaceValue,{"CUMPLE_SLA_3D", "DEPARTAMENTO", "Pet_atis", "Identificador_PC_Linea", "external_id", "AÑO_CIERRE", "MES_CIERRE"}),
+    Changed_Type = Table.TransformColumnTypes(Replaced_NULL_null,{{"CUMPLE_SLA_3D", type text}, {"Pet_atis", type text}, {"Identificador_PC_Linea", type text}, {"Fecha_de_cierre_final", type date}, {"external_id", type text}, {"DEPARTAMENTO", type text}, {"AÑO_CIERRE", Int64.Type}, {"MES_CIERRE", Int64.Type}}),
+    Trimmed_Text = Table.TransformColumns(Changed_Type,{{"CUMPLE_SLA_3D", Text.Trim, type text}, {"Pet_atis", Text.Trim, type text}, {"Identificador_PC_Linea", Text.Trim, type text}, {"external_id", Text.Trim, type text}, {"DEPARTAMENTO", Text.Trim, type text}}),
+    Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"CUMPLE_SLA_3D", Text.Clean, type text}, {"Pet_atis", Text.Clean, type text}, {"Identificador_PC_Linea", Text.Clean, type text}, {"external_id", Text.Clean, type text}, {"DEPARTAMENTO", Text.Clean, type text}}),
+    Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"DEPARTAMENTO", Text.Proper, type text}}),
+    Renamed_Columns = Table.RenameColumns(Capitalized_Each_Word,{{"DEPARTAMENTO", "Departamento"}, {"Pet_atis", "Atis"}, {"Identificador_PC_Linea", "ATiempo"}, {"Fecha_de_cierre_final", "Fecha"}, {"AÑO_CIERRE", "Año"}, {"MES_CIERRE", "Mes"}}),
+    Filtered_Null_Atis = Table.SelectRows(Renamed_Columns, each [Atis] <> null and [Atis] <> ""),
+    Filtered_Null_CC_Tec = Table.SelectRows(Filtered_Null_Atis, each [external_id] <> null and [external_id] <> ""),
+    Merged_Tbl_Departamentos = Table.NestedJoin(Filtered_Null_CC_Tec, {"Departamento"}, Tbl_Departamentos, {"Departamento"}, "TblDepartamentos", JoinKind.RightOuter),
+    Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Departamentos, each [Departamento] <> null and [Departamento] <> ""),
+    Removed_Columns = Table.RemoveColumns(Filtered_Null_Dep,{"TblDepartamentos"}),
+    Added_Cantidad = Table.AddColumn(Removed_Columns, "Cantidad", each 1, type number),
+    Replaced_No_Cumple_SLA = Table.ReplaceValue(Added_Cantidad,"NO","No Cumple",Replacer.ReplaceText,{"CUMPLE_SLA_3D"}),
+    Replaced_Cumple_SLA = Table.ReplaceValue(Replaced_No_Cumple_SLA,"SI","Cumple",Replacer.ReplaceText,{"CUMPLE_SLA_3D"}),
+    Pivoted_SLA = Table.Pivot(Replaced_Cumple_SLA, List.Distinct(Replaced_Cumple_SLA[CUMPLE_SLA_3D]), "CUMPLE_SLA_3D", "Cantidad", List.Sum),
+    Replaced_Null__No_Cumple = try(Table.ReplaceValue(Pivoted_SLA,null,0,Replacer.ReplaceValue,{"No Cumple"})) otherwise(Table.AddColumn(Pivoted_SLA, "No Cumple", each 0, type number)),
+    Replaced_Null__Cumple = try(Table.ReplaceValue(Replaced_Null__No_Cumple,null,0,Replacer.ReplaceValue,{"Cumple"})) otherwise(Table.AddColumn(Replaced_Null__No_Cumple, "Cumple", each 0, type number)),
+    Added_Aperturas = Table.AddColumn(Replaced_Null__Cumple, "Aperturas", each "Plazos de Mtto (3 días)", type text),
+    Added_Productos = Table.AddColumn(Added_Aperturas, "Productos", each "Todos", type text),
+    Removed_Duplicates = Table.Distinct(Added_Productos)
+in
+    Removed_Duplicates
+
+// Reitero
+let
+    Source = ProduccionTecnicos,
+    Filtered_Extension = Table.SelectRows(Source, each [Extension] = ".txt"),
+    Filtered_Folder_Path = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\CalculoBonificacion\Reitero\")),
+    Added_Year = Table.AddColumn(Filtered_Folder_Path, "Año", each Text.BetweenDelimiters([Name], "_", ".", 1, 0), type text),
+    Added_Mes = Table.AddColumn(Added_Year, "Mes", each Text.BetweenDelimiters([Name], "_", "_"), type text),
+    Changed_Type_Date = Table.TransformColumnTypes(Added_Mes,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
+    Filtered_Null_Name = Table.SelectRows(Changed_Type_Date, each [Name] <> null and [Name] <> ""),
+    Transform_Content = Table.TransformColumns(Filtered_Null_Name, {"Content", each Table.PromoteHeaders(Csv.Document(_,[Delimiter="Õ", Columns=73, Encoding=1252, QuoteStyle=QuoteStyle.None]), [PromoteAllScalars=true])}),
+    Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"Numero_de_orden_del_agendador_MTTON", "DIAS_REITERO", "EXCLUSION", "REITERO", "ESTADO_FINAL", "Tipo_de_orden", "Subtipo_de_orden", "Pet_atis", "Identificador_PC_Linea", "Identificador_PC_TV", "Nombre_de_Cliente", "No_identificacion_cliente", "Tipo_Documento_Cliente", "Segmento", "Descripcion_de_Segmento", "Subsegmento", "Descripcion_de_Subsegmento", "Fecha_de_cierre_final", "AÑO_CIERRE", "MES_CIERRE", "DIA_CIERRE", "Fecha_Registro_en_Front", "Segmento_homologado", "Barrio", "Familia", "IP_TV", "Zona_de_trabajo_TOA", "Numero_de_actuacion", "Fecha_de_registro", "XA_ACTUACION", "XA_ORDER_ATIS", "XA_WORK_TYPE", "XA_CREATION_DATE", "Medio_de_Acceso", "DEPARTAMENTO", "Ciudad", "contratista", "provider_source", "external_id", "APERTURA_AV", "CIERRE_AV", "Numero_de_orden_del_agendador_MTTOA", "Tipo_de_orden_MTTOA", "subtipo_de_orden_MTTOA", "pet atis_MTTOA", "Identificador_PC_Linea_MTTOA", "Identificador_PC_TV_MTTOA", "Nombre_de_Cliente_MTTOA", "No_identificacion_cliente_MTTOA", "Tipo_Documento_Cliente_MTTOA", "Segmento_MTTOA", "Descripcion_de_Segmento_MTTOA", "Subsegmento_MTTOA", "Descripcion_de_Subsegmento_MTTOA", "Familia_MTTOA", "Fecha_de_cierre_final_MTTOA", "Fecha_Registro_en_Front_MTTOA", "Segmento_homologado_MTTOA", "Barrio_MTTOA", "Zona_de_trabajo_TOA_MTTOA", "Numero_de_actuacion_MTTOA", "Fecha_de_registro_MTTOA", "XA_ORDER_ATIS_MTTOA", "XA_WORK_TYPE_MTTOA", "XA_CREATION_DATE_MTTOA", "Medio_de_Acceso_MTTOA", "DEPARTAMENTO_MTTOA", "CIUDAD_MTTOA", "contratista_MTTOA", "provider_source_MTTOA", "external_id_MTTOA", "APERTURA_AV_MTTOA", "CIERRE_AV_MTTOA"}, {"Numero_de_orden_del_agendador_MTTON", "DIAS_REITERO", "EXCLUSION", "REITERO", "ESTADO_FINAL", "Tipo_de_orden", "Subtipo_de_orden", "Pet_atis", "Identificador_PC_Linea", "Identificador_PC_TV", "Nombre_de_Cliente", "No_identificacion_cliente", "Tipo_Documento_Cliente", "Segmento", "Descripcion_de_Segmento", "Subsegmento", "Descripcion_de_Subsegmento", "Fecha_de_cierre_final", "AÑO_CIERRE", "MES_CIERRE", "DIA_CIERRE", "Fecha_Registro_en_Front", "Segmento_homologado", "Barrio", "Familia", "IP_TV", "Zona_de_trabajo_TOA", "Numero_de_actuacion", "Fecha_de_registro", "XA_ACTUACION", "XA_ORDER_ATIS", "XA_WORK_TYPE", "XA_CREATION_DATE", "Medio_de_Acceso", "DEPARTAMENTO", "Ciudad", "contratista", "provider_source", "external_id", "APERTURA_AV", "CIERRE_AV", "Numero_de_orden_del_agendador_MTTOA", "Tipo_de_orden_MTTOA", "subtipo_de_orden_MTTOA", "pet atis_MTTOA", "Identificador_PC_Linea_MTTOA", "Identificador_PC_TV_MTTOA", "Nombre_de_Cliente_MTTOA", "No_identificacion_cliente_MTTOA", "Tipo_Documento_Cliente_MTTOA", "Segmento_MTTOA", "Descripcion_de_Segmento_MTTOA", "Subsegmento_MTTOA", "Descripcion_de_Subsegmento_MTTOA", "Familia_MTTOA", "Fecha_de_cierre_final_MTTOA", "Fecha_Registro_en_Front_MTTOA", "Segmento_homologado_MTTOA", "Barrio_MTTOA", "Zona_de_trabajo_TOA_MTTOA", "Numero_de_actuacion_MTTOA", "Fecha_de_registro_MTTOA", "XA_ORDER_ATIS_MTTOA", "XA_WORK_TYPE_MTTOA", "XA_CREATION_DATE_MTTOA", "Medio_de_Acceso_MTTOA", "DEPARTAMENTO_MTTOA", "CIUDAD_MTTOA", "contratista_MTTOA", "provider_source_MTTOA", "external_id_MTTOA", "APERTURA_AV_MTTOA", "CIERRE_AV_MTTOA"}),
+    Filtered_Separador = Table.SelectRows(Expanded_Content, each not Text.Contains([Numero_de_orden_del_agendador_MTTON], "-")),
+    Filtered_Null_Column2 = Table.SelectRows(Filtered_Separador, each [DIAS_REITERO] <> null and [DIAS_REITERO] <> ""),
+    Filtered_Null_Fecha = Table.SelectRows(Filtered_Null_Column2, each [Fecha_de_cierre_final] <> null and [Fecha_de_cierre_final] <> ""),
+    Transform_Fecha = Table.TransformColumns(Filtered_Null_Fecha,{{"Fecha_de_cierre_final", each Date.From(Value.FromText(_)), type date}}),
+    Removed_Other_Columns = Table.SelectColumns(Transform_Fecha,{"Pet_atis", "Identificador_PC_Linea", "Fecha_de_cierre_final", "AÑO_CIERRE", "MES_CIERRE", "Familia", "Medio_de_Acceso", "DEPARTAMENTO", "external_id", "APERTURA_AV", "CIERRE_AV", "external_id_MTTOA"}),
+    Replaced_NULL_Null = Table.ReplaceValue(Removed_Other_Columns,"NULL",null,Replacer.ReplaceValue,{"Pet_atis", "Identificador_PC_Linea", "Familia", "Medio_de_Acceso", "DEPARTAMENTO", "external_id", "APERTURA_AV", "CIERRE_AV", "external_id_MTTOA"}),
+    Changed_Type = Table.TransformColumnTypes(Replaced_NULL_Null,{{"Pet_atis", type text}, {"APERTURA_AV", type text}, {"CIERRE_AV", type text}, {"Medio_de_Acceso", type text}, {"AÑO_CIERRE", Int64.Type}, {"MES_CIERRE", Int64.Type}, {"Identificador_PC_Linea", type text}, {"Fecha_de_cierre_final", type date}, {"Familia", type text}, {"DEPARTAMENTO", type text}, {"external_id", type text}, {"external_id_MTTOA", type text}}),
+    Trimmed_Text = Table.TransformColumns(Changed_Type,{{"Pet_atis", Text.Trim, type text}, {"Identificador_PC_Linea", Text.Trim, type text}, {"Familia", Text.Trim, type text}, {"Medio_de_Acceso", Text.Trim, type text}, {"DEPARTAMENTO", Text.Trim, type text}, {"external_id", Text.Trim, type text}, {"APERTURA_AV", Text.Trim, type text}, {"CIERRE_AV", Text.Trim, type text}, {"external_id_MTTOA", Text.Trim, type text}}),
+    Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Pet_atis", Text.Clean, type text}, {"Identificador_PC_Linea", Text.Clean, type text}, {"Familia", Text.Clean, type text}, {"Medio_de_Acceso", Text.Clean, type text}, {"DEPARTAMENTO", Text.Clean, type text}, {"external_id", Text.Clean, type text}, {"APERTURA_AV", Text.Clean, type text}, {"CIERRE_AV", Text.Clean, type text}, {"external_id_MTTOA", Text.Clean, type text}}),
+    Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"DEPARTAMENTO", Text.Proper, type text}}),
+    Renamed_Columns = Table.RenameColumns(Capitalized_Each_Word,{{"Pet_atis", "Atis"}, {"Identificador_PC_Linea", "ATiempo"}, {"Fecha_de_cierre_final", "Fecha"}, {"AÑO_CIERRE", "Año"}, {"MES_CIERRE", "Mes"}, {"DEPARTAMENTO", "Departamento"}}),
+    Filtered_Null_Atis = Table.SelectRows(Renamed_Columns, each [Atis] <> null and [Atis] <> ""),
+    Merged_Tbl_Departamentos = Table.NestedJoin(Filtered_Null_Atis, {"Departamento"}, Tbl_Departamentos, {"Departamento"}, "TblDepartamentos", JoinKind.RightOuter),
+    Filtered_Null_Departamento = Table.SelectRows(Merged_Tbl_Departamentos, each [Departamento] <> null and [Departamento] <> ""),
+    Removed_Tbl_Departamentos = Table.RemoveColumns(Filtered_Null_Departamento,{"TblDepartamentos"}),
+    Added_Aperturas = Table.AddColumn(Removed_Tbl_Departamentos, "Aperturas", each "Averías reiteradas", type text),
+    Added_Productos = Table.AddColumn(Added_Aperturas, "Productos", each if(([Medio_de_Acceso]="COBRE")and(([Familia]="DTH")or([Familia]="TV")))then("TV-DTH")else(if(([Medio_de_Acceso]="COBRE")and(([Familia]="DUO")or([Familia]="DUOS")))then("LB BA")else(if(([Medio_de_Acceso]="FIBRA") and ([Familia]="TV"))then("TV-IPTV")else(if(([Medio_de_Acceso]="FIBRA")and([Familia]="DUOS"))then("FTTH")else(if(([Medio_de_Acceso]="FIBRA")and([Familia]="TRIO"))then("FIBRA")else("LB"))))), type text),
+    Added_No_Cumple = Table.AddColumn(Added_Productos, "No Cumple", each if([external_id_MTTOA]=null)then(0)else(1), type number),
+    Selected_Columns_No_Cumple = Table.SelectColumns(Added_No_Cumple,{"Atis", "ATiempo", "Fecha", "Año", "Mes", "Departamento", "external_id_MTTOA", "Aperturas", "Productos", "No Cumple"}),
+    Filtered_External_Mtto = Table.SelectRows(Selected_Columns_No_Cumple, each [external_id_MTTOA] <> null and [external_id_MTTOA] <> ""),
+    Renamed_Columns_No_Cumple = Table.RenameColumns(Filtered_External_Mtto,{{"external_id_MTTOA", "external_id"}}),
+    Added_Cumple = Table.AddColumn(Added_Productos, "Cumple", each if([external_id]=null)then(0)else(1), type number),
+    Filtered_Null_External_Id_Mtto = Table.SelectRows(Added_Cumple, each [external_id_MTTOA] = null),
+    Selected_Columns_Cumple = Table.SelectColumns(Filtered_Null_External_Id_Mtto,{"Atis", "ATiempo", "Fecha", "Año", "Mes", "Departamento", "external_id", "Aperturas", "Productos", "Cumple"}),
+    Filtered_External = Table.SelectRows(Selected_Columns_Cumple, each [external_id] <> null and [external_id] <> ""),
+    Appended_Query = Table.Combine({Filtered_External, Renamed_Columns_No_Cumple}),
+    Replaced_Null = Table.ReplaceValue(Appended_Query,null,0,Replacer.ReplaceValue,{"Cumple", "No Cumple"})
+in
+    Replaced_Null
+
+// Infancia
+let
+    Source = ProduccionTecnicos,
+    Filtered_Extension = Table.SelectRows(Source, each ([Extension] = ".txt")),
+    Filtered_Folder_Path = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\CalculoBonificacion\Infancia\")),
+    Added_Year = Table.AddColumn(Filtered_Folder_Path, "Año", each Text.BetweenDelimiters([Name], "_", ".", 1, 0), type text),
+    Added_Mes = Table.AddColumn(Added_Year, "Mes", each Text.BetweenDelimiters([Name], "_", "_"), type text),
+    Changed_Type_Date = Table.TransformColumnTypes(Added_Mes,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
+    Filtered_Null_Name = Table.SelectRows(Changed_Type_Date, each [Name] <> null and [Name] <> ""),
+    Transform_Content = Table.TransformColumns(Filtered_Null_Name, {"Content", each Table.PromoteHeaders(Csv.Document(_,[Delimiter="Õ", Columns=43, Encoding=1252, QuoteStyle=QuoteStyle.None]), [PromoteAllScalars=true])}),
+    Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"Numero_de_orden_del_agendador_ALTA", "XA_ACTUACION_ALTA", "Pet_atis_ALTA", "PRODUCTO", "DIAS_INFANCIA", "INFANCIA", "exclusiones_contrato", "Dar_cumplimiento", "Tipo_de_orden_ALTA", "Subtipo_de_orden_ALTA", "Medio_de_Acceso_ALTA", "contratista", "Departamento_ALTA", "FAMILIA_ALTA", "Subsegmento_ALTA", "Descripcion_de_Subsegmento_ALTA", "Ciudad", "Fecha_Registro_en_Front_ALTA", "Fecha_de_cierre_final_ALTA", "AÑO_CIERRE", "MES_CIERRE", "DIA_CIERRE", "provider_source", "external_id", "Identificador_PC_Linea", "Identificador_PC_TV", "Nombre_de_Cliente", "No_identificacion_cliente", "Numero_de_orden_del_agendador_MTTO", "XA_ACTUACION_MTTO", "Pet_atis_MTTO", "Medio_de_Acceso_MTTO", "Tipo_de_orden_MTTO", "Fecha_Registro_en_Front_MTTO", "Fecha_de_cierre_final_MTTO", "MTTO_AÑO_CIERRE", "MTTO_MES_CIERRE", "MTTO_DIA_CIERRE", "provider_source_MTTO", "external_id_MTTO", "CIERRE_AV", "APERTURA_AV", "FILA"}, {"Numero_de_orden_del_agendador_ALTA", "XA_ACTUACION_ALTA", "Pet_atis_ALTA", "PRODUCTO", "DIAS_INFANCIA", "INFANCIA", "exclusiones_contrato", "Dar_cumplimiento", "Tipo_de_orden_ALTA", "Subtipo_de_orden_ALTA", "Medio_de_Acceso_ALTA", "contratista", "Departamento_ALTA", "FAMILIA_ALTA", "Subsegmento_ALTA", "Descripcion_de_Subsegmento_ALTA", "Ciudad", "Fecha_Registro_en_Front_ALTA", "Fecha_de_cierre_final_ALTA", "AÑO_CIERRE", "MES_CIERRE", "DIA_CIERRE", "provider_source", "external_id", "Identificador_PC_Linea", "Identificador_PC_TV", "Nombre_de_Cliente", "No_identificacion_cliente", "Numero_de_orden_del_agendador_MTTO", "XA_ACTUACION_MTTO", "Pet_atis_MTTO", "Medio_de_Acceso_MTTO", "Tipo_de_orden_MTTO", "Fecha_Registro_en_Front_MTTO", "Fecha_de_cierre_final_MTTO", "MTTO_AÑO_CIERRE", "MTTO_MES_CIERRE", "MTTO_DIA_CIERRE", "provider_source_MTTO", "external_id_MTTO", "CIERRE_AV", "APERTURA_AV", "FILA"}),
+    Filtered_Separador = Table.SelectRows(Expanded_Content, each not Text.Contains([Numero_de_orden_del_agendador_ALTA], "-")),
+    Filtered_Null_Column2 = Table.SelectRows(Filtered_Separador, each [XA_ACTUACION_ALTA] <> null and [XA_ACTUACION_ALTA] <> ""),
+    Filtered_Null_Fecha = Table.SelectRows(Filtered_Null_Column2, each [Fecha_de_cierre_final_ALTA] <> null and [Fecha_de_cierre_final_ALTA] <> ""),
+    Transform_Fecha = Table.TransformColumns(Filtered_Null_Fecha,{{"Fecha_de_cierre_final_ALTA", each Date.From(Value.FromText(_)), type date}}),
+    Removed_Other_Columns = Table.SelectColumns(Transform_Fecha,{"XA_ACTUACION_ALTA", "Pet_atis_ALTA", "PRODUCTO", "Medio_de_Acceso_ALTA", "Departamento_ALTA", "Fecha_de_cierre_final_ALTA", "external_id", "CIERRE_AV", "APERTURA_AV"}),
+    Added_Year_2 = Table.AddColumn(Removed_Other_Columns, "Año", each Date.Year(Date.AddMonths(DateTime.From([Fecha_de_cierre_final_ALTA]), 1)), Int64.Type),
+    Added_Mes_2 = Table.AddColumn(Added_Year_2, "Mes", each Date.Month(Date.AddMonths(DateTime.From([Fecha_de_cierre_final_ALTA]), 1)), Int64.Type),
+    Replaced_NULL_null = Table.ReplaceValue(Added_Mes_2,"NULL",null,Replacer.ReplaceValue,{"XA_ACTUACION_ALTA", "Pet_atis_ALTA", "PRODUCTO", "Medio_de_Acceso_ALTA", "Departamento_ALTA", "external_id", "CIERRE_AV", "APERTURA_AV"}),
+    Changed_Type = Table.TransformColumnTypes(Replaced_NULL_null,{{"XA_ACTUACION_ALTA", type text}, {"Pet_atis_ALTA", type text}, {"PRODUCTO", type text}, {"Medio_de_Acceso_ALTA", type text}, {"Departamento_ALTA", type text}, {"Fecha_de_cierre_final_ALTA", type date}, {"external_id", type text}, {"CIERRE_AV", type text}, {"APERTURA_AV", type text}}),
+    Trimmed_Text = Table.TransformColumns(Changed_Type,{{"XA_ACTUACION_ALTA", Text.Trim, type text}, {"Pet_atis_ALTA", Text.Trim, type text}, {"PRODUCTO", Text.Trim, type text}, {"Medio_de_Acceso_ALTA", Text.Trim, type text}, {"Departamento_ALTA", Text.Trim, type text}, {"external_id", Text.Trim, type text}, {"CIERRE_AV", Text.Trim, type text}, {"APERTURA_AV", Text.Trim, type text}}),
+    Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"XA_ACTUACION_ALTA", Text.Clean, type text}, {"Pet_atis_ALTA", Text.Clean, type text}, {"PRODUCTO", Text.Clean, type text}, {"Medio_de_Acceso_ALTA", Text.Clean, type text}, {"Departamento_ALTA", Text.Clean, type text}, {"external_id", Text.Clean, type text}, {"CIERRE_AV", Text.Clean, type text}, {"APERTURA_AV", Text.Clean, type text}}),
+    Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"Departamento_ALTA", Text.Proper, type text}}),
+    Renamed_Columns = Table.RenameColumns(Capitalized_Each_Word,{{"Departamento_ALTA", "Departamento"}, {"XA_ACTUACION_ALTA", "ATiempo"}, {"Pet_atis_ALTA", "Atis"}, {"Fecha_de_cierre_final_ALTA", "Fecha"}}),
+    Filtered_Null_Atis = Table.SelectRows(Renamed_Columns, each [Atis] <> null and [Atis] <> ""),
+    Filtered_Null_CC_Tec = Table.SelectRows(Filtered_Null_Atis, each [external_id] <> null and [external_id] <> ""),
+    Merged_Tbl_Departamentos = Table.NestedJoin(Filtered_Null_CC_Tec, {"Departamento"}, Tbl_Departamentos, {"Departamento"}, "TblDepartamentos", JoinKind.RightOuter),
+    Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Departamentos, each [Departamento] <> null and [Departamento] <> ""),
+    Removed_Columns = Table.RemoveColumns(Filtered_Null_Dep,{"TblDepartamentos"}),
+    Added_No_Cumple = Table.AddColumn(Removed_Columns, "No Cumple", each 1, type number),
+    Added_Productos = Table.AddColumn(Added_No_Cumple, "Productos", each if([PRODUCTO]="DUO") and ([Medio_de_Acceso_ALTA]="FIBRA") then("FTTH") else(if([Medio_de_Acceso_ALTA]="COBRE") and (([PRODUCTO]="DUO") or ([PRODUCTO]="LB"))then("LB+BA")else([PRODUCTO])), type text),
+    Replaced_IPTV = Table.ReplaceValue(Added_Productos,"IP_TV","TV (IPTV)",Replacer.ReplaceText,{"Productos"}),
+    Removed_Duplicates = Table.Distinct(Replaced_IPTV),
+    Removed_Other_Columns_Fin = Table.SelectColumns(Removed_Duplicates,{"ATiempo", "Atis", "Departamento", "Fecha", "external_id", "Año", "Mes", "No Cumple", "Productos"}),
+    Appended_Altas_Mes_Ant = Table.Combine({Removed_Other_Columns_Fin, Altas_Mes_Anterior}),
+    Replaced_Null_Cumple_No_Cumple = Table.ReplaceValue(Appended_Altas_Mes_Ant,null,0,Replacer.ReplaceValue,{"No Cumple", "Cumple"}),
+    Added_Aperturas = Table.AddColumn(Replaced_Null_Cumple_No_Cumple, "Aperturas", each "Cumplimiento de averías de infancia", type text)
+in
+    Added_Aperturas
+
+// Altas_Mes_Anterior
+let
+    Source = ProduccionTecnicos,
+    Filtered_Extension = Table.SelectRows(Source, each ([Extension] = ".txt")),
+    Filtered_Folder_Path = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\CalculoBonificacion\Altas Mes Anterior\")),
+    Added_Year = Table.AddColumn(Filtered_Folder_Path, "Año", each Text.BetweenDelimiters([Name], "_", ".", 1, 0), type text),
+    Added_Mes = Table.AddColumn(Added_Year, "Mes", each Text.BetweenDelimiters([Name], "_", "_"), type text),
+    Changed_Type_Date = Table.TransformColumnTypes(Added_Mes,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
+    Filtered_Null_Name = Table.SelectRows(Changed_Type_Date, each [Name] <> null and [Name] <> ""),
+    Transform_Content = Table.TransformColumns(Filtered_Null_Name, {"Content", each Table.PromoteHeaders(Csv.Document(_,[Delimiter="Õ", Columns=26, Encoding=1252, QuoteStyle=QuoteStyle.None]), [PromoteAllScalars=true])}),
+    Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"Numero_de_actuacion", "Subtipo_de_orden", "Pet_atis", "Tipo_de_orden", "Ciudad", "Departamento", "Departamento_Contrato", "Familia", "Fecha_de_cierre_final", "AÑO", "MES", "DIA", "contratista", "Segmento", "Identificador_PC_Linea", "LB", "BA", "TV", "IP_TV", "ESTADO_FINAL", "external_id", "Fecha_Registro_en_Front", "Subsegmento", "Identificador_PC_TV", "XA_DISTRIBUIDOR", "Medio_de_Acceso"}, {"Numero_de_actuacion", "Subtipo_de_orden", "Pet_atis", "Tipo_de_orden", "Ciudad", "Departamento", "Departamento_Contrato", "Familia", "Fecha_de_cierre_final", "AÑO.1", "MES.1", "DIA", "contratista", "Segmento", "Identificador_PC_Linea", "LB", "BA", "TV", "IP_TV", "ESTADO_FINAL", "external_id", "Fecha_Registro_en_Front", "Subsegmento", "Identificador_PC_TV", "XA_DISTRIBUIDOR", "Medio_de_Acceso"}),
+    Filtered_Separador = Table.SelectRows(Expanded_Content, each not Text.Contains([Numero_de_actuacion], "-")),
+    Filtered_Null_Column2 = Table.SelectRows(Filtered_Separador, each [Subtipo_de_orden] <> null and [Subtipo_de_orden] <> ""),
+    Filtered_Null_Fecha = Table.SelectRows(Filtered_Null_Column2, each [Fecha_de_cierre_final] <> null and [Fecha_de_cierre_final] <> ""),
+    Transform_Fecha = Table.TransformColumns(Filtered_Null_Fecha,{{"Fecha_de_cierre_final", each Date.From(Value.FromText(_)), type date}}),
+    Removed_Other_Columns = Table.SelectColumns(Transform_Fecha,{"Numero_de_actuacion", "Subtipo_de_orden", "Pet_atis", "Departamento", "Fecha_de_cierre_final", "BA", "IP_TV", "external_id", "Medio_de_Acceso"}),
+    Added_Year_2 = Table.AddColumn(Removed_Other_Columns, "Año", each Date.Year(Date.AddMonths(DateTime.From([Fecha_de_cierre_final]), 1)), Int64.Type),
+    Added_Mes_2 = Table.AddColumn(Added_Year_2, "Mes", each Date.Month(Date.AddMonths(DateTime.From([Fecha_de_cierre_final]), 1)), Int64.Type),
+    Replaced_NULL_null = Table.ReplaceValue(Added_Mes_2,"NULL",null,Replacer.ReplaceValue,{"Numero_de_actuacion", "Subtipo_de_orden", "Pet_atis", "Departamento", "BA", "IP_TV", "external_id", "Medio_de_Acceso"}),
+    Changed_Type = Table.TransformColumnTypes(Replaced_NULL_null,{{"Numero_de_actuacion", type text}, {"Subtipo_de_orden", type text}, {"Pet_atis", type text}, {"Departamento", type text}, {"Fecha_de_cierre_final", type date}, {"BA", type text}, {"IP_TV", type text}, {"external_id", type text}, {"Medio_de_Acceso", type text}}),
+    Trimmed_Text = Table.TransformColumns(Changed_Type,{{"Medio_de_Acceso", Text.Trim, type text}, {"external_id", Text.Trim, type text}, {"IP_TV", Text.Trim, type text}, {"BA", Text.Trim, type text}, {"Departamento", Text.Trim, type text}, {"Pet_atis", Text.Trim, type text}, {"Subtipo_de_orden", Text.Trim, type text}, {"Numero_de_actuacion", Text.Trim, type text}}),
+    Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Medio_de_Acceso", Text.Clean, type text}, {"external_id", Text.Clean, type text}, {"IP_TV", Text.Clean, type text}, {"BA", Text.Clean, type text}, {"Departamento", Text.Clean, type text}, {"Pet_atis", Text.Clean, type text}, {"Subtipo_de_orden", Text.Clean, type text}, {"Numero_de_actuacion", Text.Clean, type text}}),
+    Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"Departamento", Text.Proper, type text}}),
+    Renamed_Columns = Table.RenameColumns(Capitalized_Each_Word,{{"Numero_de_actuacion", "ATiempo"}, {"Pet_atis", "Atis"}, {"Fecha_de_cierre_final", "Fecha"}}),
+    Filtered_Null_Atis = Table.SelectRows(Renamed_Columns, each [Atis] <> null and [Atis] <> ""),
+    Filtered_Null_CC_Tec = Table.SelectRows(Filtered_Null_Atis, each [external_id] <> null and [external_id] <> ""),
+    Merged_Tbl_Departamentos = Table.NestedJoin(Filtered_Null_CC_Tec, {"Departamento"}, Tbl_Departamentos, {"Departamento"}, "TblDepartamentos", JoinKind.RightOuter),
+    Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Departamentos, each [Departamento] <> null and [Departamento] <> ""),
+    Removed_Columns = Table.RemoveColumns(Filtered_Null_Dep,{"TblDepartamentos"}),
+    Added_LB_BA = Table.AddColumn(Removed_Columns, "LB+BA", each if([Subtipo_de_orden]="ALTALB") or ([Subtipo_de_orden]="TRASLADOLB")then(1)else(if([BA]="BA") and ([Medio_de_Acceso]="COBRE")then(1)else(0)), type number),
+    Added_IPTV = Table.AddColumn(Added_LB_BA, "TV (IPTV)", each if([IP_TV]="IP_TV")then(1)else(0), type number),
+    Added_FTTH = Table.AddColumn(Added_IPTV, "FTTH", each if([BA]="BA") and ([Medio_de_Acceso]="FIBRA") then(1)else(0), type number),
+    Unpivoted_Productos = Table.Unpivot(Added_FTTH, {"LB+BA", "TV (IPTV)", "FTTH"}, "Productos", "Cumple"),
+    Removed_Duplicates = Table.Distinct(Unpivoted_Productos),
+    Removed_Other_Columns_Fin = Table.SelectColumns(Removed_Duplicates,{"ATiempo", "Atis", "Departamento", "Fecha", "external_id", "Año", "Mes", "Productos", "Cumple"})
+in
+    Removed_Other_Columns_Fin
+
+// ISN_Alta
+let
+    Source = ProduccionTecnicos,
+    Filtered_Extension = Table.SelectRows(Source, each ([Extension] = ".txt")),
+    Filtered_Folder_Path = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\CalculoBonificacion\ISN_Altas\")),
+    Added_Year = Table.AddColumn(Filtered_Folder_Path, "Año", each Text.BetweenDelimiters([Name], "_", ".", 1, 0), type text),
+    Added_Mes = Table.AddColumn(Added_Year, "Mes", each Text.BetweenDelimiters([Name], "_", "_"), type text),
+    Changed_Type_Date = Table.TransformColumnTypes(Added_Mes,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
+    Filtered_Null_Name = Table.SelectRows(Changed_Type_Date, each [Name] <> null and [Name] <> ""),
+    Transform_Content = Table.TransformColumns(Filtered_Null_Name, {"Content", each Table.PromoteHeaders(Csv.Document(_,[Delimiter="Õ", Columns=11, Encoding=1252, QuoteStyle=QuoteStyle.None]), [PromoteAllScalars=true])}),
+    Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"contratista", "Departamento", "Departamento_Contrato", "Nom Empleado", "Num Empleado", "Pregunta3", "conteo", "DIA_ENCUESTA", "MES_ENCUESTA", "AÑO_ENCUESTA", "ORIGEN"}, {"contratista", "Departamento", "Departamento_Contrato", "Nom Empleado", "Num Empleado", "Pregunta3", "conteo", "DIA_ENCUESTA", "MES_ENCUESTA", "AÑO_ENCUESTA", "ORIGEN"}),
+    Filtered_Separador = Table.SelectRows(Expanded_Content, each not Text.Contains([contratista], "-")),
+    Filtered_Null_Column2 = Table.SelectRows(Filtered_Separador, each [Departamento] <> null and [Departamento] <> ""),
+    Removed_Other_Columns = Table.SelectColumns(Filtered_Null_Column2,{"Departamento", "Num Empleado", "Pregunta3", "conteo", "MES_ENCUESTA", "AÑO_ENCUESTA"}),
+    Changed_Type = Table.TransformColumnTypes(Removed_Other_Columns,{{"Departamento", type text}, {"Num Empleado", type text}, {"Pregunta3", type text}, {"conteo", Int64.Type}, {"MES_ENCUESTA", Int64.Type}, {"AÑO_ENCUESTA", Int64.Type}}),
+    Trimmed_Text = Table.TransformColumns(Changed_Type,{{"Departamento", Text.Trim, type text}, {"Num Empleado", Text.Trim, type text}}),
+    Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Departamento", Text.Clean, type text}, {"Num Empleado", Text.Clean, type text}}),
+    Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"Departamento", Text.Proper, type text}}),
+    Renamed_Columns = Table.RenameColumns(Capitalized_Each_Word,{{"Num Empleado", "external_id"}, {"conteo", "Cantidad"}, {"MES_ENCUESTA", "Mes"}, {"AÑO_ENCUESTA", "Año"}}),
+    Filtered_Null_CC_Tec = Table.SelectRows(Renamed_Columns, each [external_id] <> null and [external_id] <> ""),
+    Merged_Tbl_Departamentos = Table.NestedJoin(Filtered_Null_CC_Tec, {"Departamento"}, Tbl_Departamentos, {"Departamento"}, "TblDepartamentos", JoinKind.RightOuter),
+    Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Departamentos, each [Departamento] <> null and [Departamento] <> ""),
+    Removed_Columns = Table.RemoveColumns(Filtered_Null_Dep,{"TblDepartamentos"}),
+    Pivoted_Pregunta3 = Table.Pivot(Removed_Columns, List.Distinct(Removed_Columns[Pregunta3]), "Pregunta3", "Cantidad", List.Sum),
+    Replaced_Null_01 = try(Table.ReplaceValue(Pivoted_Pregunta3,null,0,Replacer.ReplaceValue,{"1"})) otherwise (Table.AddColumn(Pivoted_Pregunta3, "1", each 0, type number)),
+    Replaced_Null_02 = try(Table.ReplaceValue(Replaced_Null_01,null,0,Replacer.ReplaceValue,{"2"})) otherwise (Table.AddColumn(Replaced_Null_01, "2", each 0, type number)),
+    Replaced_Null_03 = try(Table.ReplaceValue(Replaced_Null_02,null,0,Replacer.ReplaceValue,{"3"})) otherwise (Table.AddColumn(Replaced_Null_02, "3", each 0, type number)),
+    Replaced_Null_04 = try(Table.ReplaceValue(Replaced_Null_03,null,0,Replacer.ReplaceValue,{"4"})) otherwise (Table.AddColumn(Replaced_Null_03, "4", each 0, type number)),
+    Replaced_Null_05 = try(Table.ReplaceValue(Replaced_Null_04,null,0,Replacer.ReplaceValue,{"5"})) otherwise (Table.AddColumn(Replaced_Null_04, "5", each 0, type number)),
+    Added_Cumple = Table.AddColumn(Replaced_Null_05, "Cumple", each [4] + [5], type number),
+    Added_No_Cumple = Table.AddColumn(Added_Cumple, "No Cumple", each [1] + [2], type number),
+    Added_Total = Table.AddColumn(Added_No_Cumple, "Total", each List.Sum({[1], [2], [3], [4], [5]}), type number),
+    Added_Aperturas = Table.AddColumn(Added_Total, "Aperturas", each "ISN", type text),
+    Added_Productos = Table.AddColumn(Added_Aperturas, "Productos", each "TOTAL", type text),
+    Removed_Duplicates = Table.Distinct(Added_Productos),
+    Removed_Columns_Numero = Table.RemoveColumns(Removed_Duplicates,{"3", "5", "2", "4", "1"})
+in
+    Removed_Columns_Numero
+
+// ISN_Mtto
+let
+    Source = ProduccionTecnicos,
+    Filtered_Extension = Table.SelectRows(Source, each ([Extension] = ".txt")),
+    Filtered_Folder_Path = Table.SelectRows(Filtered_Extension, each Text.Contains([Folder Path], "\CalculoBonificacion\ISN_Mtto\")),
+    Added_Year = Table.AddColumn(Filtered_Folder_Path, "Año", each Text.BetweenDelimiters([Name], "_", ".", 1, 0), type text),
+    Added_Mes = Table.AddColumn(Added_Year, "Mes", each Text.BetweenDelimiters([Name], "_", "_"), type text),
+    Changed_Type_Date = Table.TransformColumnTypes(Added_Mes,{{"Año", Int64.Type}, {"Mes", Int64.Type}}),
+    Filtered_Null_Name = Table.SelectRows(Changed_Type_Date, each [Name] <> null and [Name] <> ""),
+    Transform_Content = Table.TransformColumns(Filtered_Null_Name, {"Content", each Table.PromoteHeaders(Csv.Document(_,[Delimiter="Õ", Columns=10, Encoding=1252, QuoteStyle=QuoteStyle.None]), [PromoteAlScalars=true])}),
+    Expanded_Content = Table.ExpandTableColumn(Transform_Content, "Content", {"contratista", "departamento_contrato", "Departamento", "Nom Empleado", "Num Empleado", "Pregunta3", "conteo", "DIA_ENCUESTA", "MES_ENCUESTA", "AÑO_ENCUESTA"}, {"contratista", "departamento_contrato", "Departamento", "Nom Empleado", "Num Empleado", "Pregunta3", "conteo", "DIA_ENCUESTA", "MES_ENCUESTA", "AÑO_ENCUESTA"}),
+    Filtered_Separador = Table.SelectRows(Expanded_Content, each not Text.Contains([contratista], "-")),
+    Filtered_Null_Column2 = Table.SelectRows(Filtered_Separador, each [departamento_contrato] <> null and [departamento_contrato] <> ""),
+    Removed_Other_Columns = Table.SelectColumns(Filtered_Null_Column2,{"Departamento", "Num Empleado", "Pregunta3", "conteo", "MES_ENCUESTA", "AÑO_ENCUESTA"}),
+    Changed_Type = Table.TransformColumnTypes(Removed_Other_Columns,{{"Departamento", type text}, {"Num Empleado", type text}, {"Pregunta3", type text}, {"conteo", Int64.Type}, {"MES_ENCUESTA", Int64.Type}, {"AÑO_ENCUESTA", Int64.Type}}),
+    Trimmed_Text = Table.TransformColumns(Changed_Type,{{"Departamento", Text.Trim, type text}, {"Num Empleado", Text.Trim, type text}}),
+    Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Departamento", Text.Clean, type text}, {"Num Empleado", Text.Clean, type text}}),
+    Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"Departamento", Text.Proper, type text}}),
+    Renamed_Columns = Table.RenameColumns(Capitalized_Each_Word,{{"Num Empleado", "external_id"}, {"conteo", "Cantidad"}, {"MES_ENCUESTA", "Mes"}, {"AÑO_ENCUESTA", "Año"}}),
+    Filtered_Null_CC_Tec = Table.SelectRows(Renamed_Columns, each [external_id] <> null and [external_id] <> ""),
+    Merged_Tbl_Departamentos = Table.NestedJoin(Filtered_Null_CC_Tec, {"Departamento"}, Tbl_Departamentos, {"Departamento"}, "TblDepartamentos", JoinKind.RightOuter),
+    Filtered_Null_Dep = Table.SelectRows(Merged_Tbl_Departamentos, each [Departamento] <> null and [Departamento] <> ""),
+    Removed_Columns = Table.RemoveColumns(Filtered_Null_Dep,{"TblDepartamentos"}),
+    Pivoted_Pregunta3 = Table.Pivot(Removed_Columns, List.Distinct(Removed_Columns[Pregunta3]), "Pregunta3", "Cantidad", List.Sum),
+    Replaced_Null_01 = try(Table.ReplaceValue(Pivoted_Pregunta3,null,0,Replacer.ReplaceValue,{"1"})) otherwise (Table.AddColumn(Pivoted_Pregunta3, "1", each 0, type number)),
+    Replaced_Null_02 = try(Table.ReplaceValue(Replaced_Null_01,null,0,Replacer.ReplaceValue,{"2"})) otherwise (Table.AddColumn(Replaced_Null_01, "2", each 0, type number)),
+    Replaced_Null_03 = try(Table.ReplaceValue(Replaced_Null_02,null,0,Replacer.ReplaceValue,{"3"})) otherwise (Table.AddColumn(Replaced_Null_02, "3", each 0, type number)),
+    Replaced_Null_04 = try(Table.ReplaceValue(Replaced_Null_03,null,0,Replacer.ReplaceValue,{"4"})) otherwise (Table.AddColumn(Replaced_Null_03, "4", each 0, type number)),
+    Replaced_Null_05 = try(Table.ReplaceValue(Replaced_Null_04,null,0,Replacer.ReplaceValue,{"5"})) otherwise (Table.AddColumn(Replaced_Null_04, "5", each 0, type number)),
+    Added_Cumple = Table.AddColumn(Replaced_Null_05, "Cumple", each [4] + [5], type number),
+    Added_No_Cumple = Table.AddColumn(Added_Cumple, "No Cumple", each [1] + [2], type number),
+    Added_Total = Table.AddColumn(Added_No_Cumple, "Total", each List.Sum({[1], [2], [3], [4], [5]}), type number),
+    Added_Aperturas = Table.AddColumn(Added_Total, "Aperturas", each "ISN MTTO", type text),
+    Added_Productos = Table.AddColumn(Added_Aperturas, "Productos", each "TOTAL", type text),
+    Removed_Duplicates = Table.Distinct(Added_Productos),
+    Removed_Columns_Numero = Table.RemoveColumns(Removed_Duplicates,{"3", "5", "2", "4", "1"})
+in
+    Removed_Columns_Numero
+
+// Detalle_Bonificacion
+let
+    Source = Table.Combine({Cumplimiento_Citas, Plazo_3_Dias, Plazos, Reitero, Infancia, ISN_Alta, ISN_Mtto}),
+    Indicadores = Tabla_Indicadores,
+    Merged_Source = Table.NestedJoin(Indicadores, {"Aperturas", "Productos", "Año", "Mes"}, Source, {"Aperturas", "Productos", "Año", "Mes"}, "IndicadoresEstado", JoinKind.LeftOuter),
+    Expanded_Source = Table.ExpandTableColumn(Merged_Source, "IndicadoresEstado", {"Fecha", "Atis", "Departamento", "ATiempo", "external_id", "Cumple", "No Cumple", "Total"}, {"Fecha", "Atis", "Departamento", "ATiempo", "external_id", "Cumple", "No Cumple", "Total"}),
+    Replaced_No_Cumple = Table.ReplaceValue(Expanded_Source,0, each if(([Año]=2023)and([Mes]=1)and([Corto]="Inf LBBA"))then([Nota 75])else(0),Replacer.ReplaceValue,{"No Cumple"}),
+    Replaced_Cumple = Table.ReplaceValue(Replaced_No_Cumple,0, each if(([Año]=2023)and([Mes]=1)and([Corto]="Inf LBBA"))then(1)else(0),Replacer.ReplaceValue,{"Cumple"}),
+    Changed_Type_Cumple_Y_No = Table.TransformColumnTypes(Replaced_Cumple,{{"Cumple", type number}, {"No Cumple", type number}}),
+    Merged_Parametro_Nota = Table.NestedJoin(Changed_Type_Cumple_Y_No, {"Año", "Mes"}, Parametro_Nota, {"Año", "Mes"}, "Parametro_Nota", JoinKind.LeftOuter),
+    Expanded_Parametro_Nota = Table.ExpandTableColumn(Merged_Parametro_Nota, "Parametro_Nota", {"VrPenalAlta", "VrPenalMtto"}, {"VrPenalAlta", "VrPenalMtto"}),
+    Added_Mes_Año = Table.AddColumn(Expanded_Parametro_Nota, "Mes Año", each Text.From([Mes]) & " " & Text.From([Año]), type text),
+    Merged_Accesos = Table.NestedJoin(Added_Mes_Año, {"external_id", "Año", "Mes", "Departamento"}, Cuadrillas_Bonificacion, {"CCTec", "Año", "Mes", "Departamento"}, "AccesosCuadrillas", JoinKind.LeftOuter),
+    ExpandedAccesos =  Table.ExpandTableColumn(Merged_Accesos, "AccesosCuadrillas", {"Acceso", "Cargo", "Lineas", "Contrata", "Nom Tec", "Nom Gestor", "Nom Super"}, {"Acceso", "Cargo", "Lineas", "Contrata", "Nom Tec", "Nom Gestor", "Nom Super"}),
+    Replaced_Null_Lineas = Table.ReplaceValue(ExpandedAccesos,null,1,Replacer.ReplaceValue,{"Lineas"}),
+    Inserted_Division_Cumple = Table.AddColumn(Replaced_Null_Lineas, "Cumple_2", each [Cumple] / [Lineas], type number),
+    Inserted_Division_No_Cumple = Table.AddColumn(Inserted_Division_Cumple, "No Cumple_2", each [No Cumple] / [Lineas], type number),
+    Removed_Original_Cumple_y_No = Table.RemoveColumns(Inserted_Division_No_Cumple,{"Cumple", "No Cumple", "Lineas"}),
+    Renamed_Columns_Cumple_y_No = Table.RenameColumns(Removed_Original_Cumple_y_No,{{"Cumple_2", "Cumple"}, {"No Cumple_2", "No Cumple"}}),
+    Replaced_Null_Cargo = Table.ReplaceValue(Renamed_Columns_Cumple_y_No,null,"Admin",Replacer.ReplaceValue,{"Cargo"}),
+    Replaced_Null_Acceso = Table.ReplaceValue(Replaced_Null_Cargo,null,"9999999999",Replacer.ReplaceValue,{"Acceso"}),
+    Replaced_Null_Cuadrillas = Table.ReplaceValue(Replaced_Null_Acceso,null,"Liteyca",Replacer.ReplaceValue,{"Nom Gestor", "Nom Super", "Nom Tec", "Contrata"}),
+    Removed_Duplicates = Table.Distinct(Replaced_Null_Cuadrillas),
+    Filtered__Null_No_Cumple = Table.SelectRows(Removed_Duplicates, each [No Cumple] <> "" or [No Cumple] <> null),
+    Grouped_Rows_No_Cumple = Table.Group(Filtered__Null_No_Cumple, {"Aperturas", "Productos", "Departamento", "Acceso", "Año", "Mes"}, {{"Penaliza", each List.Average([Penaliza]), type nullable number}, {"PesoPenaliza", each List.Average([PesoPenaliza]), type nullable number}, {"Cumple", each List.Sum([Cumple]), type nullable number}, {"NoCumple", each List.Sum([No Cumple]), type nullable number}, {"Total", each List.Sum([Total]), type nullable number}, {"VrPenalAlta", each List.Average([VrPenalAlta]), type nullable number}, {"VrPenalMtto", each List.Average([VrPenalMtto]), type nullable number}, {"All", each _, type table [Aperturas=text, Productos=text, Nota 0=nullable number, Nota 75=nullable number, Nota 10=nullable number, Penaliza=nullable number, PesoPenaliza=nullable number, PESO=nullable number, Sin Nota=nullable number, Corto=nullable text, Año=nullable number, Mes=nullable number, Fecha=nullable date, Atis=nullable text, Departamento=nullable text, ATiempo=nullable text, external_id=nullable text, Cumple=nullable number, No Cumple=nullable number, Total=nullable number, VrPenalAlta=nullable number, VrPenalMtto=nullable number, Mes Año=text, Nom Gestor=nullable text, Nom Super=nullable text, Acceso=nullable text, Cargo=nullable text, Nom Tec=nullable text, Contrata=nullable text]}}),
+    Added_Cumplimiento_No_Cumple = Table.AddColumn(Grouped_Rows_No_Cumple, "%Cumplimiento", each if([Aperturas]="ISN") or([Aperturas]="ISN MTTO")then(([Cumple]/[Total])-([NoCumple]/[Total]))else(if([Aperturas]="Cumplimiento de averías de infancia") or([Aperturas]="Averías reiteradas")then(if(([Cumple]+[NoCumple])=0)then(null)else(if([Cumple]=0)then(1)else([NoCumple]/[Cumple])))else([Cumple]/([Cumple]+[NoCumple]))), type number),
+    Added_Cant_Penalizada = Table.AddColumn(Added_Cumplimiento_No_Cumple, "Cant Penailzada", each if([Penaliza]=null)then(0)else(if([Aperturas]="ISN")then([NoCumple]*[PesoPenaliza])else(if([Aperturas]="Cumplimiento de citas")then(if([#"%Cumplimiento"]>=[Penaliza])then(0)else([NoCumple]*[PesoPenaliza]))else(if([Aperturas]="Plazos de Mtto")then(if([#"%Cumplimiento"]>=[Penaliza])then(0)else([NoCumple]-([PesoPenaliza]*([Cumple]+[NoCumple]))))else(if([#"%Cumplimiento"]<=[Penaliza])then(0)else([NoCumple]-([PesoPenaliza]*[Cumple])))))), type number),
+    Removed_Other_Columns_No_Cumple = Table.SelectColumns(Added_Cant_Penalizada,{"Aperturas", "Productos", "Departamento", "Acceso", "Año", "Mes", "Penaliza", "PesoPenaliza", "VrPenalAlta", "VrPenalMtto", "All", "%Cumplimiento", "Cant Penailzada"}),
+    Expanded_All = Table.ExpandTableColumn(Removed_Other_Columns_No_Cumple, "All", {"Nota 0", "Nota 75", "Nota 10", "PESO", "Sin Nota", "Corto", "Fecha", "Atis", "ATiempo", "external_id", "Cumple", "No Cumple", "Total", "Mes Año", "Nom Gestor", "Nom Super", "Cargo", "Nom Tec", "Contrata"}, {"Nota 0", "Nota 75", "Nota 10", "PESO", "Sin Nota", "Corto", "Fecha", "Atis", "ATiempo", "external_id", "Cumple", "No Cumple", "Total", "Mes Año", "Nom Gest", "Nom Super", "Cargo", "Nom Tec", "Contrata"}),
+    Filtered_Rows_No_Cumple = Table.SelectRows(Expanded_All, each [No Cumple] <> 0),
+    Added_Index = Table.AddIndexColumn(Filtered_Rows_No_Cumple, "Índice", 1, 1, Int64.Type),
+    Added_Es_Penalizada_No_Cumple = Table.AddColumn(Added_Index, "Es Penalizada", each if([Cant Penailzada]=null)then(false)else(if([Índice]<=[Cant Penailzada])then(true)else(false)), type logical),
+    Removed_Other_Columns_No_Cumple_Final = Table.SelectColumns(Added_Es_Penalizada_No_Cumple,{"Aperturas", "Productos", "Departamento", "Acceso", "Año", "Mes", "Penaliza", "PesoPenaliza", "VrPenalAlta", "VrPenalMtto", "Nota 0", "Nota 75", "Nota 10", "PESO", "Sin Nota", "Corto", "Fecha", "Atis", "ATiempo", "external_id", "Cumple", "No Cumple", "Total", "Mes Año", "Nom Gest", "Nom Super", "Cargo", "Nom Tec", "Es Penalizada"}),
+    Filtered_Rows_Cumple = Table.SelectRows(Expanded_All, each [No Cumple] = 0),
+    Added_Es_Penalizada_Cumple = Table.AddColumn(Filtered_Rows_Cumple, "Es Penalizada", each false, type logical),
+    Appended_Querys = Table.Combine({Added_Es_Penalizada_Cumple, Removed_Other_Columns_No_Cumple_Final}),
+    Errores_Reemplazados = Table.ReplaceErrorValues(Appended_Querys, {{"Es Penalizada", false}})
+in
+    Errores_Reemplazados
+
+// Tabla_Indicadores
+let
+    Source = Tablas_Base,
+    Filtered_Rows = Source{[Item="TblFD"]}[Data],
+    Trimmed_Text = Table.TransformColumns(Filtered_Rows,{{"Aperturas", Text.Trim, type text}, {"Productos", Text.Trim, type text}}),
+    Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Aperturas", Text.Clean, type text}, {"Productos", Text.Clean, type text}}),
+    Invoke_fxCalendario_Mes = fxMiCalendarioMes(Cleaned_Text, "FechaInicio", "FechaFin"),
+    Filtered_Null_Corto = Table.SelectRows(Invoke_fxCalendario_Mes, each [Corto] <> null and [Corto] <> "")
+in
+    Filtered_Null_Corto
+
+// Parametro_Nota
+let
+    Source = Tablas_Base,
+    Filtered_Rows = Source{[Item="ParametroNota"]}[Data],
+    Invoke_fxCalendario_Mes = fxMiCalendarioMes(Filtered_Rows, "FechaInicio", "FechaFin"),
+    Removed_Duplicates = Table.Distinct(Invoke_fxCalendario_Mes)
+in
+    Removed_Duplicates
+
+// fxMiCalendarioDia
+let 
+    fxMiCalendarioDia = (TablaReferencia as table, NombreColumnaInicial as text, NombreColumnaFinal as text) => let
+        Source = try(Table.RemoveColumns(TablaReferencia,{"Año", "Mes"}))otherwise(TablaReferencia),
+        FechaMenor = NombreColumnaInicial,
+        FechaMayor= NombreColumnaFinal,
+        Duplicated_Inicial = Table.DuplicateColumn(Source, FechaMenor, "Fecha_Minima_Duplicada"),
+        FechaInicial = List.Min(Duplicated_Inicial[Fecha_Minima_Duplicada]),
+        Duplicated_Final = Table.DuplicateColumn(Duplicated_Inicial, FechaMayor, "Fecha_Maxima_Duplicada"),
+        FechaFinal = List.Max(Duplicated_Final[Fecha_Maxima_Duplicada]),
+        Added_Fecha = Table.AddColumn(Duplicated_Final, "Fecha", each if([Fecha_Minima_Duplicada]<[Fecha_Maxima_Duplicada])then({Number.From([Fecha_Minima_Duplicada])..Number.From([Fecha_Maxima_Duplicada])})else({Number.From([Fecha_Maxima_Duplicada])..Number.From([Fecha_Minima_Duplicada])})),
+        Expanded_Fecha = Table.ExpandListColumn(Added_Fecha, "Fecha"),
+        Changed_Type_Fecha = Table.TransformColumnTypes(Expanded_Fecha,{{"Fecha", type date}}),
+        Inserted_Year = Table.AddColumn(Changed_Type_Fecha, "Año", each Date.Year([Fecha]), Int64.Type),
+        Inserted_Month = Table.AddColumn(Inserted_Year, "Mes", each Date.Month([Fecha]), Int64.Type),
+        Removed_Columns_Fechas = Table.RemoveColumns(Inserted_Month,{FechaMenor, FechaMayor, "Fecha_Minima_Duplicada", "Fecha_Maxima_Duplicada"})
+    in
+        Removed_Columns_Fechas
+in
+    fxMiCalendarioDia
+
+// AccesosCuadrillas_2
+let
+    Source = Tablas_Base,
+    Filtered_Rows = Source{[Item="AccesosCuadrillas_2"]}[Data],
+    Trimmed_Text = Table.TransformColumns(Filtered_Rows,{{"Area Cuadri", Text.Trim, type text}, {"Nom Super", Text.Trim, type text}, {"Nom Gestor", Text.Trim, type text}, {"Nom Tec", Text.Trim, type text}, {"Contrata", Text.Trim, type text}, {"Departamento", Text.Trim, type text}, {"Cargo", Text.Trim, type text}}),
+    Cleaned_Text = Table.TransformColumns(Trimmed_Text,{{"Area Cuadri", Text.Clean, type text}, {"Nom Super", Text.Clean, type text}, {"Nom Gestor", Text.Clean, type text}, {"Nom Tec", Text.Clean, type text}, {"Contrata", Text.Clean, type text}, {"Departamento", Text.Clean, type text}, {"Cargo", Text.Clean, type text}}),
+    Capitalized_Each_Word = Table.TransformColumns(Cleaned_Text,{{"Area Cuadri", Text.Proper, type text}, {"Nom Super", Text.Proper, type text}, {"Nom Gestor", Text.Proper, type text}, {"Nom Tec", Text.Proper, type text}, {"Contrata", Text.Proper, type text}, {"Departamento", Text.Proper, type text}, {"Cargo", Text.Proper, type text}}),
+    Invoke_fxCalendario_Dia = fxMiCalendarioDia(Capitalized_Each_Word, "FechaMin", "FechaMax"),
+    Filtered_Null_Departamento = Table.SelectRows(Invoke_fxCalendario_Dia, each ([Departamento] <> null and [Departamento] <> "") and ([Cargo] = "Admin"))
+in
+    Filtered_Null_Departamento
+
+// Cuadrillas_Bonificacion
+let
+    Source = AccesosCuadrillas_2,
+    Removed_Date = Table.RemoveColumns(Source,{"Fecha"}),
+    Removed_Duplicates = Table.Distinct(Removed_Date),
+    Grouped_Rows = Table.Group(Removed_Duplicates, {"CCTec", "Acceso", "Cargo", "Departamento", "Año", "Mes"}, {{"Lineas", each Table.RowCount(_), Int64.Type}, {"All", each _, type table [CCTec=nullable text, Acceso=nullable text, Cargo=text, Departamento=text, Contrata=text, Nom Tec=text, Nom Gestor=text, Nom Super=text, Area Cuadri=text, ApuCuadrilla=nullable number, Año=number, Mes=number]}}),
+    Expanded_All = Table.ExpandTableColumn(Grouped_Rows, "All", {"Contrata", "Nom Tec", "Nom Gestor", "Nom Super", "Area Cuadri", "ApuCuadrilla"}, {"Contrata", "Nom Tec", "Nom Gestor", "Nom Super", "Area Cuadri", "ApuCuadrilla"})
+in
+    Expanded_All
