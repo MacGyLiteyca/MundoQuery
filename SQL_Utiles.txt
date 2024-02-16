@@ -1,0 +1,14 @@
+https://www.youtube.com/watch?v=a_rZN1cO0-E&list=PL2Z95CSZ1N4EW0PvNhd4ySZisgBrJjSW2&index=6
+Tipos de datos disponibles en SQL server Microsoft
+char -- almacena tipo de datos fijo
+varchar -- alamcena tipo de datos alfanumerico
+text -- almacena tipo de datos texto
+nchar -- igual a char pero el ancho es variable
+nvarchar --igual que varchar pero de ancho ajustable
+bit -- almacena valores de 1 y 0
+int -- almacena valores entre -2147483648 y 2147438647
+bigint -- almacena valores entre -10´38 +1 hasta 10´38 -1
+decimal -- alamcena valores entre -10´38 +1 hasta 10´38 -1
+money -- alamcena valores entre -9223372036854775808 y 9223372036854775807
+float -- alamcena valores entre -1.79E + 308 hasta 1.79E + 308
+
