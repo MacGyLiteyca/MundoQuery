@@ -12,3 +12,109 @@ decimal -- alamcena valores entre -10´38 +1 hasta 10´38 -1
 money -- alamcena valores entre -9223372036854775808 y 9223372036854775807
 float -- alamcena valores entre -1.79E + 308 hasta 1.79E + 308
 
+--Inserta en la tabla Empleados de la base de datos Prueba la informacion del archivo separado por comas
+El lenguaje se llama transac SQL o tsql
+las fecha (solo fecha) deben quedar en formato aaaa/mm/dd
+
+BULK INSERT [Prueba].[dbo].[Empleados]
+FROM 'C:\ruta.csv'
+WITH
+(
+ROWTERMINATOR = '\n',
+FIELDTERMINATOR = ','
+)
+
+
+exec sp_help empleados;
+nos da informacion sobre una tabla
+
+
+
+Create table salarios(
+nombre varchar(20),
+apellido varchar(30),
+salario decimal(18,2)
+);
+
+
+select * from salarios;
+
+
+insert into salarios(nombre, apellido, salario)
+select nombre, apellido, salario from Empleados;
+
+truncate table salarios;
+
+insert into salarios(nombre, apellido, salario)
+select nombre, apellido, salario from Empleados
+where salario>2500;
+
+select top 10 * from Empleados;
+select top 10 percent * from Empleados;
+
+
+
+create table clientes(
+idcliente int,
+nombre varchar(10),
+apellido varchar(20),
+direccion varchar(100)
+);
+
+select * from clientes;
+
+Drop table clientes;
+
+create table clientes(
+idcliente int not null,
+nombre varchar(10) not null,
+direccion varchar(100) not null,
+telefono numeric(10) null,
+email varchar(50)null
+);
+
+
+create table Personas(
+idpersona int primary key,
+nombre varchar(10) not null,
+edad int not null
+);
+
+create table Personas2(
+idpersona int,
+nombre varchar(10) not null,
+edad int not null,
+primary key (idpersona)
+);
+
+esta es la forma ideal de hacerla
+create table Personas3(
+idpersona int not null,
+nombre varchar(10) not null,
+edad int not null,
+constraint Pk_enlace_persona primary key (idpersona)
+);
+
+alter table Personas3 drop constraint Pk_enlace_persona;
+
+create table Personas5(
+idpersona int not null unique,
+nombre varchar(10),
+edad int
+);
+
+create table Personas6(
+idpersona int not null,
+nombre varchar(10),
+edad int,
+constraint UQ_idpersona unique (idpersona)
+);
+
+create table Personas7(
+idpersona int not null,
+clave varchar(10),
+nombre varchar(10),
+edad int,
+constraint UQ_idpersona unique (idpersona),
+constraint UQ_clave unique (clave)
+);
