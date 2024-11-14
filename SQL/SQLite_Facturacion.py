@@ -1,6 +1,8 @@
 import os
 import sqlite3
 from datetime import datetime
+from traceback import print_exception
+from click import clear
 
 class DatabaseManager:
     def __init__(self, db_file):
@@ -18,6 +20,18 @@ class DatabaseManager:
                 FechaProceso TEXT
             )
         ''')
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS "Facturado" (
+            "FECHA"	TEXT,
+            "NOMBRE"	TEXT,
+            "CEDULA_1"	TEXT,
+            "CUENTA"	TEXT,
+            "IDORDEN_DE_TRABAJO"	TEXT,
+            "SUBTIPO_TRABAJO"	TEXT,
+            "CONFORMACION DE CUADRILLAS.EMPRESA"	TEXT,
+            "TIPO CUADRILLAS"	TEXT
+            )
+        ''')
         # ... (crear otras tablas si es necesario)
 
     def insert_file_record(self, file_name, creation_date, modification_date):
@@ -29,7 +43,7 @@ class DatabaseManager:
                            (status, process_date, file_name))
 
     def get_files_to_process(self):
-        self.cursor.execute("SELECT NombreArchivo FROM archivos WHERE Estado='Sin procesar'")
+        self.cursor.execute("SELECT NombreArchivo FROM archivos WHERE Estado<>'Procesado'")
         return [row[0] for row in self.cursor.fetchall()]
 
     def insert_data_into_qryas(self, file_name, data):
@@ -38,17 +52,29 @@ class DatabaseManager:
             self.cursor.execute("INSERT INTO QRYAS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", row)
 
     def insert_data_into_facturado(self, data):
+        if not data:
+            print("No se pudo obtener datos del archivo Excel.")
+            return False
+
         for row in data:
-            # Ensure the row has the correct number of elements
-            if len(row) != 48:  # Adjust if the number of columns in Facturado changes
+            # Verificar que la fila tiene 8 elementos como en la estructura de la tabla "Facturado"
+            if len(row) != 8:
                 print(f"Error: Row has incorrect number of elements: {len(row)}")
-                continue
+                continue  # Salta esta fila si tiene un número incorrecto de elementos
 
-            # Create the SQL query with the correct number of placeholders
-            sql = "INSERT INTO Facturado VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            # Consulta SQL para la nueva estructura de la tabla "Facturado"
+            sql = """
+                INSERT INTO Facturado VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """
 
-            # Execute the query
-            self.cursor.execute(sql, row)
+            try:
+                self.cursor.execute(sql, row)
+                self.conn.commit()
+            except Exception as e:
+                print(f"Error inserting data into Facturado: {str(e)}")
+                continue  # Continúa con la siguiente fila en caso de error
+
+        return True
 
     def commit(self):
         self.conn.commit()
@@ -57,69 +83,78 @@ class DatabaseManager:
         self.conn.close()
 
 
+
 import os
-import openpyxl
+import pandas as pd
 
-class ExcelManager:
-  def __init__(self, directory):
-    self.directory = directory
+class ExcelReader:
+    def __init__(self, directory_path):
+        self.directory_path = directory_path
 
-  def get_excel_files(self):
+    def get_all_excel_files(self):
         excel_files = []
-        for root, _, files in os.walk(self.directory):
+        for root, _, files in os.walk(self.directory_path):
             for file in files:
                 if file.endswith('.xlsx'):
-                    excel_files.append(os.path.join(root, file))
+                    # Combina el path del archivo y su nombre en una lista
+                    full_path = os.path.join(root, file)
+                    excel_files.append(full_path)
         return excel_files
 
-  def read_sheets(self, file_path, sheet_names=None):
-    data = {}
-    try:
-      workbook = openpyxl.load_workbook(filename=file_path, read_only=True)  # Open in read-only mode
+    def read_excel_sheet(self, file_path, sheet_name):
+        # Lista de columnas requeridas en la tabla "Facturado"
+        required_columns = [
+            "FECHA", "NOMBRE", "CEDULA_1", "CUENTA", 
+            "IDORDEN_DE_TRABAJO", "SUBTIPO_TRABAJO", 
+            "CONFORMACION DE CUADRILLAS.EMPRESA", "TIPO CUADRILLAS"
+        ]
+        
+        try:
+            # Cargar hoja de Excel
+            df = pd.read_excel(file_path, sheet_name=sheet_name)
+            
+            # Seleccionar solo las columnas requeridas y agregar `None` donde falten
+            data = []
+            for _, row in df.iterrows():
+                filtered_row = [str(row[col]) if col in df.columns else None for col in required_columns]
+                data.append(filtered_row)
+                
+            return data
+        except Exception as e:
+            print(f"Error reading {file_path} in sheet {sheet_name}: {e}")
+            return None
 
-      # Read all sheets if no sheet names specified
-      if not sheet_names:
-        sheet_names = workbook.sheetnames
-
-      for sheet_name in sheet_names:
-        if sheet_name not in workbook.sheetnames:
-          print(f"Warning: Sheet '{sheet_name}' not found in '{file_path}'.")
-          continue
-        sheet = workbook[sheet_name]
-        data[sheet_name] = []
-        for row in sheet.iter_rows(min_row=2):  # Skip header row
-          data[sheet_name].append([cell.value for cell in row])  # Extract cell values
-    except Exception as e:
-      print(f"Error reading Excel file '{file_path}': {str(e)}")
-    return data
 
 
-
+import os
+from datetime import datetime
 
 if __name__ == "__main__":
-    db = DatabaseManager('D:\SQLite\Facturacion_Claro.db')
+    db = DatabaseManager('D:\\SQLite\\Facturacion_Claro.db')
     db.create_tables()
 
-    file_manager = ExcelManager("C:\\Users\\User\\OneDrive - LITEYCA DE COLOMBIA S.A.S\\Compartido\\ProyectoClaroAnt\\Claro Bot\\Facturacion")
+    # Crear instancia de ExcelReader
+    excel_reader = ExcelReader('C:\\Users\\User\\OneDrive - LITEYCA DE COLOMBIA S.A.S\\Compartido\\ProyectoClaroAnt\\Claro Bot\\Facturacion')
 
-    files = file_manager.get_excel_files()
-    
-    # Imprimir la cantidad de archivos encontrados
-    print(f"Se encontraron {len(files)} archivos.")
+    # Obtener el listado de archivos .xlsx con sus rutas completas
+    archivos_excel = excel_reader.get_all_excel_files()
 
-    for file in files:
-        file_name = os.path.basename(file).split('.')[0]
-        creation_date = datetime.fromtimestamp(os.path.getctime(file)).strftime('%Y-%m-%d %H:%M:%S')
-        modification_date = datetime.fromtimestamp(os.path.getmtime(file)).strftime('%Y-%m-%d %H:%M:%S')
+    for file in archivos_excel:
+        if os.path.isfile(file):  # `file` ya contiene la ruta completa, así que solo verificamos si es archivo
+            file_name, _ = os.path.splitext(os.path.basename(file))
+            creation_date = datetime.fromtimestamp(os.path.getctime(file)).strftime('%Y-%m-%d %H:%M:%S')
+            modification_date = datetime.fromtimestamp(os.path.getmtime(file)).strftime('%Y-%m-%d %H:%M:%S')
 
-        db.insert_file_record(file_name, creation_date, modification_date)
+            # Guardar la ruta completa del archivo en la base de datos, en lugar de solo el nombre
+            db.insert_file_record(file_name, creation_date, modification_date)
 
-        files_to_process = db.get_files_to_process()
-        for file_to_process in files_to_process:
-            data = file_manager.read_sheets(os.path.join(file_manager.directory, file_to_process + '.xlsx'), ['FINAL DE FACT'])
-            db.insert_data_into_facturado(file_to_process, data)
-            db.update_file_status(file_to_process, 'Procesado', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        data = excel_reader.read_excel_sheet(file, 'FINAL DE FACT')
+        # Insertar los datos en la base de datos
+        success = db.insert_data_into_facturado(data)
+        if success:
+            db.update_file_status(file_name, 'Procesado', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        else:
+            db.update_file_status(file_name, 'Error', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
-        db.commit()
-
+    db.commit()
     db.close()
