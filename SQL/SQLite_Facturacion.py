@@ -10,29 +10,63 @@ class DatabaseManager:
         self.cursor = self.conn.cursor()
 
     def create_tables(self):
-        # Crear las tablas si no existen
+    # Crear las tablas si no existen
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS archivos (
-                NombreArchivo TEXT PRIMARY KEY,
+                ID INTEGER PRIMARY KEY AUTOINCREMENT, -- Clave primaria autoincremental
+                NombreArchivo TEXT UNIQUE,           -- Nombre de archivo como único
                 FechaCreacion TEXT,
                 FechaModificacion TEXT,
                 Estado TEXT,
                 FechaProceso TEXT
             )
         ''')
+        # Crear tabla "Facturado" relacionada con "archivos"
         self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS "Facturado" (
-            "FECHA"	TEXT,
-            "NOMBRE"	TEXT,
-            "CEDULA_1"	TEXT,
-            "CUENTA"	TEXT,
-            "IDORDEN_DE_TRABAJO"	TEXT,
-            "SUBTIPO_TRABAJO"	TEXT,
-            "CONFORMACION DE CUADRILLAS.EMPRESA"	TEXT,
-            "TIPO CUADRILLAS"	TEXT
+            CREATE TABLE IF NOT EXISTS Facturado (
+                FECHA TEXT,
+                NOMBRE TEXT,
+                CEDULA_1 TEXT,
+                CUENTA TEXT,
+                IDORDEN_DE_TRABAJO TEXT,
+                SUBTIPO_TRABAJO TEXT,
+                EMPRESA TEXT, -- Simplificado el nombre para evitar problemas con caracteres especiales
+                TIPO_CUADRILLAS TEXT,
+                ArchivoID INTEGER, -- Clave foránea para relacionar con "archivos"
+                FOREIGN KEY (ArchivoID) REFERENCES archivos (ID) ON DELETE CASCADE
             )
         ''')
+        # Activar las Claves Foraneas existentes
+        self.cursor.execute('PRAGMA foreign_keys = ON;')
+
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Cuadrillas (
+                "CEDULA_1"	TEXT,
+                "NOMBRE"	TEXT
+            )
+        """)
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Ordenes (
+                FECHA TEXT,
+                CUENTA TEXT,
+                IDORDEN_DE_TRABAJO TEXT
+            )
+        """)
         # ... (crear otras tablas si es necesario)
+
+    def anexar_cuadrillas(self):
+        self.cursor.execute("""
+            INSERT INTO Cuadrillas (CEDULA_1, NOMBRE)
+            SELECT DISTINCT COALESCE(CEDULA_1, NOMBRE), COALESCE(NOMBRE, CEDULA_1)
+            FROM Facturado
+        """)
+
+    def anexar_ordenes(self):
+            self.cursor.execute("""
+            INSERT INTO Ordenes (FECHA, CUENTA, IDORDEN_DE_TRABAJO)
+            SELECT DISTINCT FECHA, CUENTA, IDORDEN_DE_TRABAJO
+            FROM Facturado
+        """)
 
     def insert_file_record(self, file_name, creation_date, modification_date):
         self.cursor.execute("INSERT OR IGNORE INTO archivos VALUES (?, ?, ?, 'Sin procesar', NULL)",
@@ -50,6 +84,23 @@ class DatabaseManager:
         # Aquí puedes personalizar la inserción según la estructura de QRYAS
         for row in data:
             self.cursor.execute("INSERT INTO QRYAS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", row)
+
+    def update_or_insert_file(self, file_name, creation_date, modification_date):
+        """Verifica si el archivo cambió, actualiza si es necesario, o lo inserta si no existe."""
+        self.cursor.execute("SELECT FechaModificacion FROM archivos WHERE NombreArchivo=?", (file_name,))
+        result = self.cursor.fetchone()
+
+        if result:  # Si el archivo ya existe
+            db_modification_date = result[0]
+            if db_modification_date != modification_date:
+                # Si la fecha de modificación cambió, actualizar registro y estado
+                self.cursor.execute(
+                    "UPDATE archivos SET FechaModificacion=?, Estado='Actualizado' WHERE NombreArchivo=?",
+                    (modification_date, file_name)
+                )
+        else:
+            # Si no existe, insertar nuevo registro
+            self.insert_file_record(file_name, creation_date, modification_date)
 
     def insert_data_into_facturado(self, data):
         if not data:
@@ -155,6 +206,10 @@ if __name__ == "__main__":
             db.update_file_status(file_name, 'Procesado', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         else:
             db.update_file_status(file_name, 'Error', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+
+    db.anexar_ordenes()
+    db.anexar_cuadrillas()
+    
 
     db.commit()
     db.close()
