@@ -9,24 +9,30 @@ let
         FechaMayor= NombreColumnaFinal,
     //Se duplica la columna de fecha menor
         Duplicated_Inicial = Table.DuplicateColumn(Source, FechaMenor, "Fecha_Minima_Duplicada"),
-    //Se obtiene la menor fecha como variable
-        FechaInicial = List.Min(Duplicated_Inicial[Fecha_Minima_Duplicada]),
     //Se duplica la columna de fecha mayor
         Duplicated_Final = Table.DuplicateColumn(Duplicated_Inicial, FechaMayor, "Fecha_Maxima_Duplicada"),
+    // Se obtiene la menor fecha como variable
+    FechaInicial = List.Min({List.Min(Duplicated_Final[Fecha_Minima_Duplicada]), List.Min(Duplicated_Final[Fecha_Maxima_Duplicada])}),
     //Se obtiene la mayor fecha como variable
-        FechaFinal = List.Max(Duplicated_Final[Fecha_Maxima_Duplicada]),
+        FechaFinal = List.Max({List.Max(Duplicated_Final[Fecha_Maxima_Duplicada]), List.Max(Duplicated_Final[Fecha_Minima_Duplicada])}),
     //Se obtiene la tabla de festivos
         TBLFestivos = TablaFestivos,
     //Se agrupa para obtener las fechas inicial y final en una tabla
-        Grouped_Rows_Lim_Fechas = Table.Group(Duplicated_Final, {}, {{"Menor Fecha", each List.Min([Fecha_Minima_Duplicada]), type nullable date}, {"Mayor Fecha", each List.Max([Fecha_Maxima_Duplicada]), type nullable date}}),
+        Grouped_Rows_Lim_Fechas = Table.Group(Duplicated_Final, {}, {{"Menor Fecha 1", each List.Min([Fecha_Minima_Duplicada]), type nullable date}, {"Mayor Fecha 1", each List.Max([Fecha_Maxima_Duplicada]), type nullable date}, {"Menor Fecha 2", each List.Min([Fecha_Maxima_Duplicada]), type nullable date}, {"Mayor Fecha 2", each List.Max([Fecha_Minima_Duplicada]), type nullable date}}),
+    //Se Agrega la menor fecha entre las dos columnas de fecha
+        Inserted_Earliest = Table.AddColumn(Grouped_Rows_Lim_Fechas, "Menor Fecha", each List.Min({[Menor Fecha 1], [Menor Fecha 2]}), type date),
+    //Se Agrega la mayor fecha entre las dos columnas de fecha
+        Inserted_Latest = Table.AddColumn(Inserted_Earliest, "Mayor Fecha", each List.Max({[Mayor Fecha 1], [Mayor Fecha 2]}), type date),
     //Se saca la primera fecha del año para la fecha minima
-        Calculated_Start_Year = Table.TransformColumns(Grouped_Rows_Lim_Fechas,{{"Menor Fecha", Date.StartOfYear, type date}}),
+        Calculated_Start_Year = Table.TransformColumns(Inserted_Latest,{{"Menor Fecha", Date.StartOfMonth, type date}}),
     //Se saca la ultima fecha del año para la fecha maxima
-        Calculated_End_Year = Table.TransformColumns(Calculated_Start_Year,{{"Mayor Fecha", Date.EndOfYear, type date}}),
+        Calculated_End_Year = Table.TransformColumns(Calculated_Start_Year,{{"Mayor Fecha", Date.EndOfMonth, type date}}),
     //Se fecha la columna de fechas entre las fechas maxima y minima
         Added_Fechas_Lim = Table.AddColumn(Calculated_End_Year, "Fechas_Lim", each {Number.From([Menor Fecha])..Number.From([Mayor Fecha])}),
+    //Se remueven las columnas que se agruparon        
+        Removed_Columns = Table.RemoveColumns(Added_Fechas_Lim,{"Menor Fecha 1", "Mayor Fecha 1", "Menor Fecha 2", "Mayor Fecha 2"}),
     //Se expande el listado
-        Expanded_Fechas_Lim = Table.ExpandListColumn(Added_Fechas_Lim, "Fechas_Lim"),
+        Expanded_Fechas_Lim = Table.ExpandListColumn(Removed_Columns, "Fechas_Lim"),
     //Se pasan los numeros a fechas
         Changed_Type_Fechas_Lim = Table.TransformColumnTypes(Expanded_Fechas_Lim,{{"Fechas_Lim", type date}}),
     //Se saca el año de cada fecha
